@@ -1,1048 +1,703 @@
-# Product Requirements Document (PRD)
-## Event Equipment Rental & Dispatch Management System
+﻿# Product Requirements Document (PRD)
+## VenueVault — Event Equipment Booking, Inventory & Dispatch Management
 
 ### 1. Product Overview
 
-**Product Name:** EventGear Manager
+**Product Name:** VenueVault
 
-**Product Type:** Web-based equipment rental and scheduling management system
+**Product Type:** Web-based operations platform for equipment rental and event logistics
 
-**Target Users:** Regional event equipment rental companies
+**Target Users:** Event rental businesses, warehouse teams, dispatch coordinators, and operations managers serving weddings, corporate events, conferences, and venue-based productions.
 
-**Primary Goal:** Prevent equipment overbooking and dispatch conflicts by replacing phone-based coordination with a centralized system that provides real-time equipment availability, booking management, and warehouse dispatch scheduling.
+**Primary Goal:** Replace fragmented coordination with a centralized system that provides reliable inventory visibility, booking control, dispatch planning, and return tracking across the full rental lifecycle.
+
+VenueVault helps teams answer a critical operational question in seconds: “Is this equipment available, reserved, or already assigned to another event during the required time window?”
 
 ---
 
 ## 2. Problem Statement
 
-A regional event equipment rental company supplies **sound systems, lighting equipment, furniture, and other event equipment** for weddings and corporate events.
+A regional event equipment rental company handles large, time-sensitive event setups that depend on sound systems, lighting, furniture, staging, and accessories. Today, bookings are coordinated through phone calls, WhatsApp messages, spreadsheets, and memory-heavy manual scheduling.
 
-Currently, bookings and dispatch schedules are coordinated primarily through **individual phone calls and informal communication**. This creates several problems:
+This operational model creates recurring issues:
 
-- The same equipment can accidentally be promised to multiple events.
-- Staff do not have a centralized view of upcoming bookings.
-- Conflicts are often discovered only when warehouse staff start preparing equipment.
-- Last-minute changes are difficult to communicate.
-- Employees spend significant time calling each other to verify availability.
-- Management has limited visibility into equipment utilization.
-- Manual coordination becomes especially difficult during peak wedding/event seasons.
+- The same equipment can be promised to multiple events.
+- Warehouse teams do not have a single source of truth for upcoming dispatches.
+- Availability is checked too late, often after a customer has already been verbally committed.
+- Dispatch lists are manually built and easy to miss items from.
+- Returns and damage tracking are inconsistent.
+- Managers cannot easily measure utilization, stock risk, or overdue equipment.
+- Peak season demand increases the chance of cross-team confusion and revenue loss.
 
-### Core Problem
+### Core Business Problem
 
-> **The company needs a centralized system that knows which equipment is available, booked, dispatched, or returned at any given time and prevents overlapping commitments.**
-
----
-
-# 3. Product Vision
-
-Build a centralized rental management platform where employees can:
-
-> **Check availability → Create booking → Reserve equipment → Schedule dispatch → Track return**
-
-The system should detect conflicts **before a booking is confirmed**, rather than discovering them at the warehouse.
+> The business needs a system that can track equipment availability in real time across bookings, dispatches, and returns so that commitments remain accurate and operational conflicts are caught before they reach the warehouse floor.
 
 ---
 
-# 4. Goals & Objectives
+## 3. Product Vision
+
+VenueVault will be the operational control center for all event equipment movement across a rental business.
+
+The product will support the full workflow:
+
+> Check inventory → create booking → validate availability → reserve equipment → schedule dispatch → deliver to venue → track return → make stock available again
+
+The system must stop bad commitments before they become expensive operational failures.
+
+---
+
+## 4. Goals and Objectives
 
 ### Primary Goals
 
 1. Prevent double-booking of equipment.
-2. Provide real-time equipment availability.
-3. Centralize all event bookings.
-4. Provide a clear dispatch schedule for warehouse staff.
-5. Reduce dependency on phone calls and manual coordination.
-6. Detect scheduling conflicts automatically.
-7. Track equipment from booking through return.
-8. Provide management with equipment utilization insights.
+2. Provide accurate, up-to-date availability across all inventory.
+3. Centralize customer bookings and rental coordination.
+4. Reduce manual phone-based coordination across teams.
+5. Give warehouse and dispatch teams a clear view of what must be loaded and delivered.
+6. Track equipment status from booking to return and maintenance.
+7. Improve operational visibility for management and finance teams.
+8. Support scale during seasonal peaks without adding chaos.
 
 ### Success Metrics
 
-| Metric | Target |
-|---|---:|
-| Equipment double-bookings | 0 |
-| Booking conflict detection | 100% |
-| Reduction in coordination calls | 50%+ |
-| Dispatch preparation errors | <5% |
-| Booking creation time | <3 minutes |
-| Equipment availability accuracy | >99% |
+- 0 double-booked equipment instances across overlapping periods
+- 100% of booking attempts checked against inventory and time overlap rules
+- 50% reduction in manual coordination calls between staff
+- Less than 5% dispatch preparation errors
+- Average booking creation time under 3 minutes
+- Inventory accuracy above 99%
+- 90% of staff using the same live operational view for active bookings
 
 ---
 
-# 5. User Personas
+## 5. Target Users and Personas
 
-### 5.1 Booking Staff
+### 5.1 Booking Coordinator
 
-Responsible for receiving customer requests and creating bookings.
+Responsible for receiving customer requests, capturing event details, and creating bookings.
 
-**Needs:**
-- Quickly check availability.
-- Create and modify bookings.
-- See conflicting bookings.
-- Know what equipment is available.
+Needs:
+- Quick availability validation
+- Ability to create, revise, and cancel bookings
+- Clear visibility into conflicting reservations
+- Fast access to event equipment history
 
 ### 5.2 Warehouse Manager
 
-Responsible for preparing equipment for events.
+Responsible for preparing equipment for dispatch and checking inventory readiness.
 
-**Needs:**
-- Daily dispatch schedule.
-- Equipment picking list.
-- Return schedule.
-- Know exactly what equipment needs to leave the warehouse.
+Needs:
+- Daily dispatch overview
+- Packing checklist for each event
+- Ability to mark items as ready, packed, or missing
+- Clear return and damage status at the end of a booking
 
-### 5.3 Delivery/Dispatch Staff
+### 5.3 Dispatch Team
 
-Responsible for delivering and collecting equipment.
+Responsible for loading, delivering, and collecting equipment.
 
-**Needs:**
-- Delivery schedule.
-- Event location.
-- Equipment checklist.
-- Dispatch status.
+Needs:
+- Delivery timeline and venue address
+- Equipment list per job
+- Pickup and return schedule
+- Status updates for each assigned dispatch
 
-### 5.4 Manager/Admin
+### 5.4 Operations Manager
 
-Responsible for overall operations.
+Responsible for day-to-day execution and cross-team coordination.
 
-**Needs:**
-- View all bookings.
-- Manage inventory.
-- Monitor equipment utilization.
-- Resolve conflicts.
-- View reports.
+Needs:
+- Unified dashboard view of events, stock, conflicts, and returns
+- Reporting on utilization and overdue equipment
+- Ability to resolve blocking issues quickly
 
-### 5.5 Customer
+### 5.5 Customer / Event Planner
 
-The customer organizing the event.
+The person requesting equipment for an event.
 
-**Needs:**
-- Provide event details.
-- Request required equipment.
-- Receive booking confirmation.
-- Know delivery and pickup details.
+Needs:
+- Confirmation of booking details
+- Visibility into equipment quantities and timing
+- Confidence that the company has reserved the correct items
+- Communication on delivery and pickup
 
 ---
 
-# 6. Core User Journey
+## 6. Core User Journey
 
 ```text
-Customer Request
-       ↓
-Booking Staff Creates Event
-       ↓
-Select Required Equipment
-       ↓
-System Checks Availability
-       ↓
- ┌───────────────┐
- │ Available?    │
- └───────┬───────┘
-     Yes │ No
-         │
-         ↓
-    Show Conflict
-         │
-         ↓
-Suggest Alternatives
-```
-
+Customer request
+    ↓
+Booking coordinator captures event details
+    ↓
+Coordinator selects equipment and quantity
+    ↓
+System checks inventory and time overlap
+    ↓
 If available:
+    - reserve stock
+    - create dispatch task
+    - notify warehouse
+    ↓
+Warehouse prepares equipment
+    ↓
+Dispatch team delivers to venue
+    ↓
+Event completes
+    ↓
+Equipment returned and inspected
+    ↓
+Inventory restored for future bookings
+```
+
+If unavailable:
 
 ```text
-Confirm Booking
-      ↓
-Reserve Equipment
-      ↓
-Generate Dispatch Schedule
-      ↓
-Warehouse Picks Equipment
-      ↓
-Equipment Dispatched
-      ↓
-Event Completed
-      ↓
-Equipment Returned
-      ↓
-Equipment Available Again
+System identifies conflict
+    ↓
+Shows shortage quantity and overlapping bookings
+    ↓
+Suggests alternative time slots or substitute equipment
+    ↓
+Coordinator can adjust or escalate for approval
 ```
 
 ---
 
-# 7. Functional Requirements
+## 7. Functional Requirements
 
-## 7.1 User Authentication
+### 7.1 Authentication and Authorization
 
-The system should support role-based authentication.
-
-### Roles
+The system must support role-based login for the following roles:
 
 - Admin
 - Booking Staff
 - Warehouse Staff
 - Dispatch Staff
-- Manager
+- Operations Manager
 
-Each role should have appropriate permissions.
+Required permission model:
 
-| Feature | Admin | Booking | Warehouse | Dispatch |
-|---|---|---|---|---|
-| Create Booking | ✅ | ✅ | ❌ | ❌ |
-| Modify Booking | ✅ | ✅ | ❌ | ❌ |
-| Manage Equipment | ✅ | ❌ | ✅ | ❌ |
-| View Schedule | ✅ | ✅ | ✅ | ✅ |
-| Dispatch Equipment | ✅ | ❌ | ✅ | ✅ |
-| Reports | ✅ | ❌ | ❌ | ❌ |
+- Admin: full access to all modules and settings
+- Booking Staff: create and edit bookings, view inventory, limited reporting
+- Warehouse Staff: manage dispatch checklist, stock status, returns, maintenance
+- Dispatch Staff: view assigned deliveries and pickups, update status
+- Operations Manager: dashboard, reports, approvals, conflict resolution
 
----
+### 7.2 Equipment Management
 
-# 8. Equipment Management
+The system should support management of every rental item in the catalog.
 
-Admins should be able to manage all rental equipment.
+Required fields:
 
-### Equipment Fields
+- Equipment ID
+- Name
+- Category
+- Total quantity
+- Available quantity
+- Condition
+- Status
+- Warehouse location
+- Rental price
+- Description
+- Maintenance notes
 
-```text
-Equipment ID
-Name
-Category
-Quantity
-Available Quantity
-Condition
-Location
-Status
-Rental Price
-Description
-```
+Supported categories may include:
 
-### Equipment Categories
-
-- Sound Systems
+- Audio systems
 - Speakers
 - Microphones
 - Amplifiers
-- LED Lights
-- Stage Lights
+- LED lights
+- Stage lighting
 - Tables
 - Chairs
 - Sofas
 - Projectors
 - Generators
+- Accessories and cables
 
-### Equipment Status
+Supported status values:
 
-```text
-Available
-Reserved
-Dispatched
-Under Maintenance
-Damaged
-Retired
-```
+- Available
+- Reserved
+- Dispatched
+- In use
+- Under maintenance
+- Damaged
+- Retired
 
----
+### 7.3 Booking Management
 
-# 9. Inventory Availability
+Staff must be able to create, modify, and cancel bookings.
 
-The system should calculate equipment availability based on existing bookings.
+Required booking details:
 
-For example:
+- Booking ID
+- Customer name
+- Customer contact
+- Event name
+- Event type
+- Event date
+- Start time
+- End time
+- Venue
+- Equipment list with quantity by item
+- Delivery time
+- Pickup time
+- Assigned staff
+- Booking status
+- Internal notes
+- Special instructions
 
-### Inventory
-
-```text
-Wireless Microphones: 10
-```
-
-### Booking A
-
-```text
-June 10
-Required: 4
-```
-
-### Booking B
-
-```text
-June 10
-Required: 5
-```
-
-Remaining:
-
-```text
-10 - 4 - 5 = 1
-```
-
-The system should allow another booking requiring **1 microphone**, but reject a booking requiring **2 microphones**.
-
----
-
-# 10. Booking Management
-
-Staff should be able to create an event booking.
-
-### Booking Information
-
-```text
-Booking ID
-Customer Name
-Customer Contact
-Event Name
-Event Type
-Event Date
-Event Start Time
-Event End Time
-Venue
-Required Equipment
-Delivery Time
-Pickup Time
-Assigned Staff
-Booking Status
-Notes
-```
-
-### Event Types
+Supported event types:
 
 - Wedding
-- Corporate Event
+- Corporate event
 - Birthday
 - Concert
 - Conference
 - Exhibition
 - Other
 
----
+### 7.4 Inventory Availability Logic
 
-# 11. Conflict Detection
+The system must calculate available inventory by item and time period.
 
-This is the **most important feature** of the system.
-
-Before confirming a booking, the system should check:
-
-> Does another booking require the same equipment during an overlapping period?
-
-### Example
-
-Existing booking:
+A booking should only be confirmed if the following condition is met:
 
 ```text
-Wedding A
-10 Oct
-4 PM – 11 PM
-
-10 Speakers
-```
-
-New booking:
-
-```text
-Corporate Event B
-10 Oct
-6 PM – 9 PM
-
-8 Speakers
-```
-
-If only 12 speakers exist:
-
-```text
-10 + 8 = 18
-
-Available = 12
-Required = 18
-```
-
-The system should prevent confirmation.
-
-### Conflict Message
-
-```text
-⚠ Equipment Conflict
-
-8 Speakers are requested for this booking.
-
-Only 2 speakers are available during:
-10 Oct, 6:00 PM – 9:00 PM
-
-Existing booking:
-Wedding A
-4:00 PM – 11:00 PM
-```
-
----
-
-# 12. Alternative Suggestions
-
-Instead of simply rejecting the booking, the system should suggest alternatives.
-
-For example:
-
-```text
-⚠ Speakers unavailable
-
-Possible alternatives:
-
-• 2 PM – 5 PM
-• 11 PM – 2 AM
-• Use 6 available speakers
-• Replace with Sound System B
-• Check another equipment branch
-```
-
----
-
-# 13. Dispatch Management
-
-Once a booking is confirmed, the system should automatically create a dispatch task.
-
-### Dispatch Details
-
-```text
-Dispatch ID
-Booking ID
-Event
-Venue
-Dispatch Date
-Dispatch Time
-Equipment List
-Assigned Staff
-Vehicle
-Status
-```
-
-### Dispatch Status
-
-```text
-Pending
-Preparing
-Ready
-Dispatched
-Delivered
-Returned
-Completed
-```
-
----
-
-# 14. Warehouse Dashboard
-
-The warehouse should have a dedicated dashboard.
-
-### Today's Dispatches
-
-```text
-------------------------------------------------
-Today's Dispatches
-
-09:00 AM
-Wedding - Sharma
-Jaipur
-12 Speakers
-40 Chairs
-Status: Preparing
-
-11:30 AM
-Corporate Event - ABC Pvt Ltd
-Jaipur
-2 Projectors
-10 Microphones
-Status: Ready
-
-04:00 PM
-Wedding - Singh
-Jaipur
-20 Chairs
-6 Lights
-Status: Pending
-------------------------------------------------
-```
-
----
-
-# 15. Equipment Picking List
-
-For every dispatch, warehouse staff should receive a checklist.
-
-Example:
-
-```text
-Wedding - Sharma
-
-☐ Speaker × 12
-☐ Microphone × 4
-☐ Amplifier × 2
-☐ LED Light × 8
-☐ Power Cable × 10
-
-[Mark Ready]
-```
-
-This reduces the possibility of equipment being forgotten during loading.
-
----
-
-# 16. Return Management
-
-When equipment returns to the warehouse, staff should record:
-
-```text
-Returned Equipment
-Quantity
-Condition
-Damage
-Missing Items
-Return Time
-Notes
+Reserved quantity for overlapping bookings + requested quantity <= total inventory
 ```
 
 Example:
 
 ```text
-12 Speakers dispatched
-
-Returned: 12
-Damaged: 1
-Missing: 0
-
-Status → Maintenance
+Inventory: 10 wireless microphones
+Booking A: 4 microphones, 10 Jun, 2 PM–8 PM
+Booking B: 5 microphones, 10 Jun, 4 PM–9 PM
+Remaining inventory: 1 microphone
 ```
 
-The damaged equipment should automatically become unavailable for future bookings.
+The system should allow a new booking requiring 1 microphone, but reject a booking requiring 2 or more.
 
----
+### 7.5 Conflict Detection
 
-# 17. Calendar View
+This is the core product feature.
 
-The application should provide a calendar displaying:
+Before confirming a booking, the system must compare the proposed booking against all overlapping bookings for the same equipment category or item.
 
-- Events
-- Equipment reservations
-- Dispatches
-- Returns
+If the requested inventory exceeds available stock during the overlapping period, the system must:
 
-Example:
+- block booking confirmation
+- show the conflicting item quantity
+- show the overlapping bookings
+- display the exact unavailable time window
+- recommend alternative time slots or substitute equipment where relevant
+
+Example conflict message:
 
 ```text
-        MON     TUE     WED     THU
-
-Morning   E1      E2      -       E4
-
-Afternoon E1      E3      E5      E4
-
-Evening   E1      E3      E5      -
+Equipment conflict: 8 speakers requested for this booking.
+Only 2 speakers are available between 6:00 PM and 9:00 PM on 10 Oct.
+Conflicting active booking: Wedding A, 4:00 PM–11:00 PM
+Suggested alternatives:
+- shift start time to 2:00 PM
+- reduce quantity to 6
+- consider sound system B as a substitute
 ```
 
-Users should be able to click an event to see its complete booking information.
+### 7.6 Dispatch Management
 
----
+Once a booking is confirmed, the system must create a dispatch task automatically.
 
-# 18. Notifications
+Required dispatch fields:
 
-The system should notify relevant employees about important events.
-
-### Notifications
-
-- New booking created
-- Booking modified
-- Booking cancelled
-- Equipment conflict
-- Dispatch approaching
-- Equipment not returned
-- Equipment damaged
-- Booking requires attention
-
-Example:
-
-> 🔔 **Dispatch Reminder:** Wedding Sharma's equipment must be ready for dispatch at 9:00 AM tomorrow.
-
----
-
-# 19. Booking Modification
-
-Staff should be able to modify:
-
-- Event date
-- Event time
-- Equipment quantity
-- Venue
-- Customer details
-
-Whenever a booking is modified, the system should **run the availability check again**.
-
----
-
-# 20. Booking Cancellation
-
-When a booking is cancelled:
-
-```text
-Booking → Cancelled
-        ↓
-Equipment reservation released
-        ↓
-Inventory becomes available
-```
-
-The system should maintain cancellation history.
-
----
-
-# 21. Dashboard
-
-The main dashboard should provide an operational overview.
-
-### KPIs
-
-```text
-Today's Events           12
-
-Equipment Reserved       78%
-
-Pending Dispatches        5
-
-Equipment in Maintenance 7
-
-Overdue Returns           2
-```
-
-### Dashboard Sections
-
-- Today's events
-- Upcoming events
-- Pending dispatches
-- Equipment conflicts
-- Overdue returns
-- Equipment utilization
-- Recent bookings
-
----
-
-# 22. Search & Filtering
-
-Users should be able to search by:
-
-### Booking
-
-- Customer name
+- Dispatch ID
 - Booking ID
-- Event type
-- Date
-
-### Equipment
-
-- Equipment name
-- Category
-- Equipment ID
+- Event name
+- Venue
+- Dispatch date
+- Dispatch time
+- Equipment checklist
+- Assigned staff
+- Vehicle or transport reference
 - Status
 
-### Filters
+Dispatch statuses:
 
-```text
-Date
-Status
-Event Type
-Equipment Category
-Assigned Staff
-```
+- Pending
+- Preparing
+- Ready
+- Dispatched
+- Delivered
+- Returned
+- Completed
 
----
+### 7.7 Equipment Picking List
 
-# 23. Reporting
-
-Managers should be able to view:
-
-### Equipment Utilization
-
-```text
-Equipment          Utilization
-
-Speakers              87%
-Microphones           72%
-LED Lights             91%
-Chairs                 65%
-Projectors             54%
-```
-
-### Reports
-
-- Most rented equipment
-- Equipment utilization
-- Revenue by event
-- Revenue by equipment
-- Cancelled bookings
-- Damaged equipment
-- Overdue returns
-- Peak booking periods
-
----
-
-# 24. Non-Functional Requirements
-
-### Performance
-
-- Dashboard should load within 2–3 seconds.
-- Availability checks should return within 1 second under normal load.
-- System should support multiple employees simultaneously.
-
-### Reliability
-
-The system must maintain accurate equipment availability even when multiple employees create bookings simultaneously.
-
-### Security
-
-- Secure authentication.
-- Role-based authorization.
-- Password hashing.
-- Input validation.
-- Audit logs for booking changes.
-
-### Availability
-
-Target:
-
-> **99.5% system availability**
-
-during business operations.
-
-### Scalability
-
-The system should initially support:
-
-```text
-50+ employees
-10,000+ equipment records
-100,000+ bookings
-```
-
-and be designed so capacity can grow later.
-
----
-
-# 25. Audit Log
-
-The system should record major actions.
+Every dispatch should generate a packing checklist that warehouse staff can mark as complete.
 
 Example:
 
 ```text
-10:32 AM
-Rahul created Booking #BK1024
-
-10:35 AM
-Rahul added 10 speakers
-
-10:40 AM
-Priya modified event time
-
-10:41 AM
-System detected equipment conflict
+Wedding - Sharma
+[ ] 12 Speakers
+[ ] 4 Microphones
+[ ] 2 Amplifiers
+[ ] 8 LED Lights
+[ ] 10 Power Cables
+[ ] Mark ready for dispatch
 ```
 
-This helps management determine **who changed what and when**.
+### 7.8 Return and Damage Tracking
+
+When equipment is returned, staff should record:
+
+- Returned quantity
+- Condition on return
+- Damaged quantities
+- Missing quantities
+- Return time
+- Notes
+
+If any item is damaged or missing, the system should:
+
+- flag inventory as unavailable until resolved
+- update equipment status to maintenance or damaged
+- log the issue for operations review
+
+### 7.9 Calendar View
+
+The application must provide a calendar showing:
+
+- bookings
+- equipment reservations
+- dispatch tasks
+- return schedules
+
+Users should be able to click a booking to view complete details.
+
+### 7.10 Notifications
+
+Relevant users should receive notifications for:
+
+- new booking created
+- booking changed
+- booking cancelled
+- equipment conflict detected
+- dispatch approaching
+- overdue equipment return
+- equipment marked damaged
+- booking requiring review
+
+### 7.11 Search and Filtering
+
+Users should be able to search and filter by:
+
+- customer name
+- booking ID
+- event type
+- event date
+- equipment name
+- category
+- status
+- assigned staff
+- venue
+
+### 7.12 Reporting and Analytics
+
+Managers should be able to view operational reports such as:
+
+- equipment utilization
+- most rented items
+- revenue by event
+- revenue by equipment category
+- cancelled bookings
+- damaged equipment
+- overdue returns
+- peak booking period analysis
 
 ---
 
-# 26. MVP Scope
-
-For the first version, focus on the features directly solving the problem.
-
-### MVP Features
-
-1. **Authentication**
-   - Login
-   - Role-based access
-
-2. **Equipment Management**
-   - Add equipment
-   - Update equipment
-   - View availability
-
-3. **Booking Management**
-   - Create booking
-   - Edit booking
-   - Cancel booking
-
-4. **Conflict Detection**
-   - Date/time overlap detection
-   - Quantity-based availability
-
-5. **Calendar**
-   - Booking calendar
-   - Equipment reservations
-
-6. **Dispatch**
-   - Dispatch schedule
-   - Equipment checklist
-   - Dispatch status
-
-7. **Returns**
-   - Return equipment
-   - Record damage/missing items
-
-8. **Dashboard**
-   - Upcoming events
-   - Dispatches
-   - Equipment availability
-
----
-
-# 27. Future Features
-
-### Customer Portal
-
-Customers can browse equipment, request quotes, confirm bookings, and track deliveries.
-
-### Online Payments
-
-Integrate UPI, cards, and payment gateways.
-
-### Automated WhatsApp Notifications
-
-Send customers and staff delivery and booking updates.
-
-### Route Optimization
-
-Optimize delivery routes when multiple events occur on the same day.
-
-### Multiple Warehouse Support
-
-Track equipment across different warehouse locations.
-
-### QR/Barcode Tracking
-
-Scan equipment through:
-
-```text
-Warehouse → Vehicle → Event → Warehouse
-```
-
-### Demand Forecasting
-
-Use historical bookings to predict equipment demand during peak periods.
-
----
-
-# 28. Key Business Rules
+## 8. Business Rules
 
 ### Rule 1 — No Overbooking
 
-```text
-Total Reserved Quantity
-≤
-Total Available Quantity
-```
+The sum of equipment reserved for overlapping bookings must never exceed total inventory.
 
 ### Rule 2 — Time Overlap Matters
 
-Two bookings only conflict when their rental periods overlap.
+Two bookings conflict only when they overlap in time and request the same item or category.
 
-### Rule 3 — Cancelled Bookings Don't Reserve Equipment
+### Rule 3 — Cancelled Bookings Release Inventory
+
+Cancelled bookings must release the previously reserved stock and remove it from active conflict checks.
 
 ### Rule 4 — Dispatched Equipment Is Unavailable
 
-### Rule 5 — Damaged Equipment Is Unavailable
+Items assigned to an active dispatch cannot be reserved for another booking unless returned and revalidated.
 
-### Rule 6 — Returned Equipment Becomes Available Only After Inspection
+### Rule 5 — Damaged Items Are Not Available
 
-### Rule 7 — Booking Changes Trigger Availability Revalidation
+Any item marked damaged or under maintenance is excluded from availability calculations until inspected and restored.
 
-### Rule 8 — Concurrent Bookings Must Be Transaction-Safe
+### Rule 6 — Equipment Returns Must Be Inspected
 
-Two employees might simultaneously try to reserve the last available equipment. The backend must ensure that both requests cannot successfully reserve the same inventory.
+A returned item becomes available only after it is checked and marked ready.
 
----
+### Rule 7 — Booking Changes Trigger Revalidation
 
-# 29. Suggested System Architecture
+Any update to dates, times, quantities, or venue should re-run the availability check.
 
-```text
-                    ┌──────────────┐
-                    │   Frontend   │
-                    │ React / Web  │
-                    └──────┬───────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │     API      │
-                    │ Node/Express │
-                    └──────┬───────┘
-                           │
-            ┌──────────────┼──────────────┐
-            ▼              ▼              ▼
-       Booking         Inventory       Dispatch
-       Service          Service         Service
-            │              │              │
-            └──────────────┼──────────────┘
-                           ▼
-                    ┌──────────────┐
-                    │   Database   │
-                    │              │
-                    │ Users        │
-                    │ Equipment    │
-                    │ Bookings     │
-                    │ Reservations │
-                    │ Dispatches   │
-                    │ Returns      │
-                    └──────────────┘
-```
+### Rule 8 — Concurrent Booking Requests Must Be Safe
+
+Two staff members may attempt to reserve the same last item at nearly the same time. The backend must enforce transactional locking or equivalent logic so both cannot successfully reserve the same stock.
+
+### Rule 9 — Audit Trail Required
+
+Every essential system action, including create, edit, cancel, conflict detection, and dispatch updates, must be recorded with user and timestamp.
 
 ---
 
-# 30. Core Data Models
+## 9. Core Data Model
 
 ### User
 
 ```text
 User
- ├── id
- ├── name
- ├── email
- ├── password
- └── role
+- id
+- name
+- email
+- passwordHash
+- role
+- createdAt
 ```
 
 ### Equipment
 
 ```text
 Equipment
- ├── id
- ├── name
- ├── category
- ├── totalQuantity
- ├── availableQuantity
- ├── status
- └── rentalPrice
+- id
+- name
+- category
+- totalQuantity
+- availableQuantity
+- condition
+- status
+- warehouseLocation
+- rentalPrice
+- description
+- updatedAt
 ```
 
 ### Booking
 
 ```text
 Booking
- ├── id
- ├── customer
- ├── eventType
- ├── startDateTime
- ├── endDateTime
- ├── venue
- └── status
+- id
+- customerName
+- customerContact
+- eventName
+- eventType
+- startDateTime
+- endDateTime
+- venue
+- status
+- createdBy
+- createdAt
+- updatedAt
 ```
 
 ### BookingItem
 
 ```text
 BookingItem
- ├── bookingId
- ├── equipmentId
- └── quantity
+- id
+- bookingId
+- equipmentId
+- quantity
+- notes
 ```
 
 ### Dispatch
 
 ```text
 Dispatch
- ├── id
- ├── bookingId
- ├── dispatchTime
- ├── assignedStaff
- └── status
+- id
+- bookingId
+- dispatchDate
+- dispatchTime
+- assignedStaff
+- status
+- equipmentChecklist
+- venue
 ```
 
-### Return
+### ReturnRecord
 
 ```text
-Return
- ├── id
- ├── bookingId
- ├── returnTime
- ├── condition
- ├── damagedQuantity
- └── missingQuantity
+ReturnRecord
+- id
+- bookingId
+- returnedAt
+- condition
+- damagedQuantity
+- missingQuantity
+- notes
 ```
 
 ---
 
-# 31. Critical Availability Logic
+## 10. Critical Availability Logic
 
 ```text
-Requested Equipment
-        +
-Requested Date/Time
+Requested equipment + requested time window
         ↓
-Find overlapping bookings
+Find all overlapping bookings
         ↓
-Calculate reserved quantity
+Calculate reserved quantity for matching inventory items
         ↓
-Compare with total inventory
+Compare reserved quantity against total quantity
         ↓
- ┌─────────────────────┐
- │ Available Quantity  │
- │ >= Requested Qty?   │
- └──────────┬──────────┘
-            │
-       ┌────┴────┐
-      YES        NO
-       │          │
-       ▼          ▼
-   Allow       Reject
-   Booking     Booking
-                 │
-                 ▼
-          Show Conflict
+If available quantity >= requested quantity
+    → confirm booking
+Else
+    → reject and show conflicts + alternatives
 ```
 
-This is the **central business logic of the product**.
+This is the primary business decision engine of the product.
 
 ---
 
-# 32. Out of Scope for MVP
+## 11. Non-Functional Requirements
 
-The following should not be included initially:
+### Performance
 
-- Full accounting system
-- Payroll
-- Advanced CRM
-- AI-based demand prediction
-- Online payment processing
-- Route optimization
-- Customer mobile application
-- Multi-company marketplace
+- Dashboard loads within 2–3 seconds under normal use.
+- Availability validation returns in under 1 second for standard booking checks.
+- The system supports multiple simultaneous employees without data inconsistency.
+
+### Reliability
+
+- Inventory availability must remain accurate even when multiple users create bookings concurrently.
+- Failed or partial operations must be recoverable with audit logs.
+
+### Security
+
+- Secure login and session management
+- Role-based authorization
+- Password hashing
+- Input validation on all forms
+- Audit logs for booking changes and operational actions
+
+### Availability
+
+- Target 99.5% uptime during normal business operations
+- System should remain usable during high-season booking spikes
+
+### Scalability
+
+The product should support:
+
+- 50+ employees
+- 10,000+ equipment records
+- 100,000+ bookings
+- growth in additional warehouse locations and event categories in later releases
 
 ---
 
-# 33. Acceptance Criteria
+## 12. MVP Scope
 
-### Booking
+The first release should focus on the core operational problem: preventing overbooking and improving dispatch planning.
 
-- Staff can create a booking.
-- Staff can select multiple equipment types.
-- System checks availability before confirmation.
-- System prevents conflicting bookings.
+### In Scope for MVP
 
-### Inventory
+1. Authentication and role-based access
+2. Equipment catalog management
+3. Booking creation and editing
+4. Booking cancellation
+5. Time-based inventory validation
+6. Conflict detection and explanation
+7. Booking calendar
+8. Dispatch generation and status tracking
+9. Equipment return and damage recording
+10. Dashboard with key operational KPIs
 
-- Equipment quantity is tracked.
-- Reserved equipment is not counted as available.
-- Returned equipment can become available.
-- Damaged equipment is excluded from available inventory.
+### Out of Scope for MVP
 
-### Dispatch
+- full accounting or billing system
+- payroll and employee management
+- mobile app for customers
+- AI forecasting
+- route optimization
+- payment processing
+- multi-company marketplace
+- advanced CRM integration
 
-- Confirmed bookings appear in the dispatch dashboard.
-- Warehouse staff can see the equipment checklist.
-- Dispatch status can be updated.
+---
 
-### Conflict Detection
+## 13. Release Plan
+
+### Phase 1 — Core Operations
+
+- user login and permissions
+- equipment master data
+- booking creation and validation
+- conflict detection
+- calendar and dashboard
+
+### Phase 2 — Dispatch Execution
+
+- dispatch checklist generation
+- warehouse status management
+- return management
+- damage tracking
+- audit trail improvements
+
+### Phase 3 — Insights and Scale
+
+- reporting and analytics
+- exports and filtered views
+- better inventory forecasting
+- automation of alerts and notifications
+
+---
+
+## 14. Acceptance Criteria
+
+### Booking workflow
+
+- A staff member can create a booking with equipment, event time, venue, and customer details.
+- Availability is checked before the booking is confirmed.
+- A booking cannot be confirmed if it exceeds available inventory for an overlapping period.
+- A booking can be updated and revalidated after edits.
+- A cancelled booking releases equipment for future reservations.
+
+### Inventory control
+
+- Equipment quantities are tracked accurately.
+- Reserved stock is deducted from availability calculations.
+- Dispatched and damaged equipment is excluded from available stock until restored.
+- Returned equipment becomes available only after inspection.
+
+### Dispatch flows
+
+- Confirmed bookings create a dispatch record automatically.
+- Warehouse staff can view a checklist for each dispatch.
+- Dispatch status can be updated from pending to completed.
+- Returns create a traceable record tied to the original booking.
+
+### Conflict handling
 
 Given:
 
 ```text
 Inventory = 10 speakers
-
-Booking A = 7 speakers
-10 AM – 6 PM
-
-Booking B = 4 speakers
-2 PM – 5 PM
+Booking A = 7 speakers, 10 AM–6 PM
+Booking B = 4 speakers, 2 PM–5 PM
 ```
 
 The system must reject Booking B because:
@@ -1051,16 +706,42 @@ The system must reject Booking B because:
 7 + 4 = 11 > 10
 ```
 
+The system should show the conflicting booking and the exact shortage.
+
 ---
 
-# 34. Product Success Definition
+## 15. Product Success Definition
 
-The product is successful if the company can move from:
+VenueVault is successful when the operational team can move from:
 
-> **"Let me call the warehouse and check whether those speakers are free."**
+> “Let me call the warehouse and check whether those speakers are free.”
 
 to:
 
-> **"The system already knows whether those speakers are available."**
+> “The system already knows whether those speakers are available for the date and time requested.”
 
-The most important outcome is therefore **not simply digitizing bookings**. It is creating a **single source of truth for equipment availability and scheduling**, so that an equipment conflict is detected **before it reaches the warehouse loading stage**.
+The most valuable outcome is not simply digital record-keeping. The real value is a single source of truth for equipment availability, dispatch readiness, and return status—so conflicts are prevented before the warehouse is forced to absorb them.
+
+---
+
+## 16. Key Risks and Assumptions
+
+### Risks
+
+- Staff may resist switching from informal coordination to a centralized system
+- Data quality issues may cause inventory inaccuracies at launch
+- Incomplete return tracking can create hidden stock losses
+- Seasonal demand spikes may expose performance bottlenecks
+
+### Assumptions
+
+- The business already has a defined inventory catalog and categories
+- Events are booked in advance with a known venue and schedule
+- Staff can be trained on a single operational workflow
+- The first version will prioritize reliability and accuracy over advanced AI or customer-facing features
+
+---
+
+## 17. Summary
+
+VenueVault addresses a concrete and costly operational problem: equipment is being coordinated manually, availability is not always visible, and double-booking leads to preventable disruption. The product focuses on one primary outcome—accurate, real-time availability and assignment control across bookings, dispatch, and returns—while remaining practical enough for an MVP launch.
