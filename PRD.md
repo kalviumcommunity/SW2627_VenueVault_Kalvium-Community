@@ -745,3 +745,8 @@ The most valuable outcome is not simply digital record-keeping. The real value i
 ## 17. Summary
 
 VenueVault addresses a concrete and costly operational problem: equipment is being coordinated manually, availability is not always visible, and double-booking leads to preventable disruption. The product focuses on one primary outcome—accurate, real-time availability and assignment control across bookings, dispatch, and returns—while remaining practical enough for an MVP launch.
+
+## 18.setup work(checklit)
+1.flutter(check)
+2.firebase(check)
+3.android studio(in progress)
