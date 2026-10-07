@@ -749,3 +749,4 @@ VenueVault addresses a concrete and costly operational problem: equipment is bei
 ## 18.setup work(checklit)
 1.flutter(check)
 2.firebase(check)
+3.android studio(in progress)
