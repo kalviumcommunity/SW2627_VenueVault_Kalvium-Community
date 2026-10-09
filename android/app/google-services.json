@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "450976963343",
+    "project_id": "venue-vault-kalvium-community",
+    "storage_bucket": "venue-vault-kalvium-community.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:450976963343:android:4eeaa8f91672594a1dbc7a",
+        "android_client_info": {
+          "package_name": "com.example.venue_vault"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZ2JdYO6bCTtfp807GoIFv710uxhtFRwc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
