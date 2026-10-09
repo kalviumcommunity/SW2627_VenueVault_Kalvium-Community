@@ -1,0 +1,228 @@
+According to the project requirements, you need to create five internal staff user roles. The role definitions are documented in PRD.md.
+Required user roles
+
+
+
+
+Role
+
+Main responsibility
+
+Permissions
+
+
+
+
+Admin
+
+System administrator
+
+Full access to every module and setting
+
+
+
+Booking Staff
+
+Handles customer requests and reservations
+
+Create, edit, and cancel bookings; view inventory; access limited reports
+
+
+
+Warehouse Staff
+
+Prepares and receives rental equipment
+
+Manage dispatch checklists, stock status, returns, and maintenance
+
+
+
+Dispatch Staff
+
+Delivers and collects equipment
+
+View assigned deliveries and pickups; update dispatch status
+
+
+
+Operations Manager
+
+Oversees operations and resolves issues
+
+View dashboards and reports; approve actions; resolve booking and inventory conflicts
+
+
+
+1. Admin
+Typical user
+An owner, system administrator, or senior employee responsible for configuring VenueVault.
+Permissions
+Full access to all application modules
+View, create, edit, and delete equipment
+View and manage all bookings
+Manage inventory and warehouse information
+Manage dispatches, deliveries, pickups, and returns
+View and modify maintenance records
+Access all dashboards and reports
+Approve or reject operational actions
+Resolve booking and inventory conflicts
+Configure application settings
+Manage staff accounts and assign roles
+View audit logs
+
+Recommended restrictions
+Admin should be the only role allowed to:
+Change user roles
+Disable or delete staff accounts
+Change system-wide settings
+Modify security or authorization configuration
+
+The PRD explicitly states that Admin has “full access to all modules and settings,” although user-management permissions are implied rather than separately listed.
+
+2. Booking Staff
+Typical user
+A booking coordinator or customer service employee who creates and manages event reservations.
+Permissions
+Create new bookings
+Edit existing bookings
+Cancel bookings
+View equipment availability
+View inventory quantities
+Check for overlapping bookings
+Add customer and event details
+Add equipment to a booking
+View booking history
+View limited reports
+Assign operational staff where allowed by the workflow
+
+Should not normally be allowed to
+Modify total equipment quantities
+Mark equipment as returned or damaged
+Change maintenance records
+Update dispatch completion statuses
+Approve major conflicts or exceptions
+Manage users
+Change system settings
+
+The PRD’s Booking Coordinator persona requires quick availability checks and the ability to create, revise, and cancel bookings. See PRD.md.
+
+3. Warehouse Staff
+Typical user
+A warehouse employee or warehouse manager who prepares equipment for events and handles returns.
+Permissions
+View upcoming dispatches
+View equipment required for each booking
+Manage packing and dispatch checklists
+Mark equipment as ready
+Mark equipment as packed
+Mark equipment as missing
+Update stock status
+Record returned equipment
+Record damaged equipment
+Record equipment condition
+Add maintenance notes
+Mark equipment for maintenance
+Update return status
+View relevant booking and event information
+
+Should not normally be allowed to
+Create or cancel customer bookings
+Change rental prices
+Change user roles
+Approve business-level conflicts
+Access unrelated financial or administrative settings
+Modify bookings beyond warehouse-related status information
+
+The warehouse responsibilities are described in the Warehouse Manager section of PRD.md.
+
+4. Dispatch Staff
+Typical user
+A driver, delivery coordinator, or pickup team member responsible for transporting equipment.
+Permissions
+View deliveries assigned to them
+View pickups assigned to them
+View venue addresses and delivery timelines
+View the equipment list for assigned jobs
+Update delivery status
+Update pickup status
+Mark an assignment as started
+Mark an assignment as delivered
+Mark an assignment as picked up
+Report delivery problems or failed pickups
+View the operational details necessary to complete assigned jobs
+
+Should not normally be allowed to
+View or modify unrelated bookings
+Change inventory totals
+Edit equipment rental prices
+Approve conflicts
+Modify maintenance records
+Manage users
+Access full business reports
+
+Dispatch access should be limited to assigned deliveries and pickups. The PRD specifically describes the Dispatch Team as responsible for loading, delivering, collecting, and updating statuses for assigned jobs.
+
+5. Operations Manager
+Typical user
+A manager responsible for coordinating bookings, warehouse preparation, dispatch, inventory, and exceptions.
+Permissions
+View the main operational dashboard
+View bookings, stock, dispatches, and returns
+Access operational reports
+View utilization reports
+View overdue equipment reports
+Approve operational actions
+Resolve booking conflicts
+Resolve inventory conflicts
+Escalate or approve exceptions
+Monitor dispatch readiness
+Monitor return and damage issues
+Review problems reported by warehouse or dispatch staff
+View audit history
+
+Should not normally be allowed to
+Change security rules
+Delete administrator accounts
+Modify core system settings
+Change user roles unless explicitly delegated by an Admin
+
+The Operations Manager permissions are listed in PRD.md, and the persona details are in PRD.md.
+
+Customer or Event Planner
+The PRD identifies Customer / Event Planner as a business persona, but it is not currently listed as one of the five role-based login roles.
+Customers may eventually need a separate portal where they can:
+Submit booking requests
+View their own booking details
+View booking status
+Review invoices or rental information
+Contact the rental business
+
+However, based on the current requirements, you should not create Customer as an internal administrative role. If implemented later, it should be a restricted external role that can access only its own bookings.
+
+Recommended accounts to create
+For testing or initial setup, create at least:
+admin@yourcompany.com — Admin
+booking@yourcompany.com — Booking Staff
+warehouse@yourcompany.com — Warehouse Staff
+dispatch@yourcompany.com — Dispatch Staff
+operations@yourcompany.com — Operations Manager
+
+For a real company, create individual accounts instead of shared accounts, for example:
+john.booking@company.com
+maya.warehouse@company.com
+alex.dispatch@company.com
+
+This is important because the project requires each essential action to be recorded with the acting user and timestamp, including create, edit, cancel, conflict detection, and dispatch updates. See PRD.md.
+Important current implementation status
+The requirements describe role-based access, but the current application is still a Flutter starter screen in main.dart. There is currently no implemented login, role model, or permission enforcement in the app or Cloud Functions.
+Also, firestore.rules currently allows anyone to read and write the database until November 5, 2026. Therefore, creating Firebase Authentication users alone will not yet enforce these permissions. The project still needs:
+Firebase Authentication accounts
+A stored role for each user, preferably using Firebase custom claims or a controlled users collection
+Role-aware Flutter navigation and screens
+Firestore security rules based on the authenticated user’s role
+Server-side validation for sensitive actions
+Audit logging for important operations
+
+The safest access hierarchy is:
+Admin → Operations Manager → Department Staff
+where Booking, Warehouse, and Dispatch Staff receive only the permissions required for their specific responsibilities.
