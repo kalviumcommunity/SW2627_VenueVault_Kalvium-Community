@@ -57,3 +57,25 @@ flutter run
 
 The Firebase project is already selected in `.firebaserc`. Do not commit
 secrets, local Firebase credentials, or generated build output.
+
+## Contributing
+
+To contribute to VenueVault:
+
+1. Create a focused branch from the default branch.
+2. Make the smallest change that addresses the issue or feature.
+3. Run the relevant Flutter checks and backend checks before opening a PR:
+
+   ```powershell
+   flutter analyze
+   flutter test
+   cd functions
+   npm run lint
+   npm run build
+   ```
+
+4. Open a pull request with a clear summary, testing details, and screenshots
+   for UI changes.
+
+Keep pull requests focused and avoid committing generated files, build
+artifacts, Firebase credentials, or unrelated formatting changes.
