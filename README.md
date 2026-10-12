@@ -79,3 +79,4 @@ To contribute to VenueVault:
 
 Keep pull requests focused and avoid committing generated files, build
 artifacts, Firebase credentials, or unrelated formatting changes.
+thank you
