@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
+import 'new_booking_page.dart';
 
 const demoEmail = 'demo@venuevault.test';
 const demoPassword = 'VenueVault123!';
@@ -486,7 +487,13 @@ class HomePage extends StatelessWidget {
                 icon: Icons.add_circle_outline,
                 title: 'Create booking',
                 subtitle: 'Reserve equipment for a new event',
-                onTap: () => _showComingSoon(context, 'Create booking'),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NewBookingPage(),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 10),
               _ActionTile(
