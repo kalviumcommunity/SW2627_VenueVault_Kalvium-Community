@@ -226,3 +226,4 @@ Audit logging for important operations
 The safest access hierarchy is:
 Admin → Operations Manager → Department Staff
 where Booking, Warehouse, and Dispatch Staff receive only the permissions required for their specific responsibilities.
+firebase setup on website in progress.

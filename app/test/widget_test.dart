@@ -18,6 +18,8 @@ void main() {
 
     expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('Use test account'), findsOneWidget);
+    expect(find.text('Work email'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('Use test account'), findsNothing);
   });
 }

@@ -1,0 +1,534 @@
+{
+  "_readme": [
+    "ALL DATA IS FICTIONAL. Every document has isTestData: true so it is easy to find and delete.",
+    "Collection and field names are PROPOSED. The app has no Firestore code yet (app/lib has only main.dart, firebase_options.dart and new_booking_page.dart).",
+    "The first four equipment items copy the hardcoded inventory in app/lib/new_booking_page.dart (name, category, details, total).",
+    "The booking page currently collects only a date range and a set of item names. Quantities, customer details and statuses are additions for testing.",
+    "'available' is not stored: it is computed as totalQuantity - unitsInMaintenance - quantities on overlapping non-cancelled bookings.",
+    "Replace every UID_* value with the real Firebase Auth UID after creating the accounts. Replace UID_DISPATCH_2 BEFORE UID_DISPATCH.",
+    "Dates are ISO strings here; enter them as Firestore Timestamp. Quantities are Number. 'system' is a literal string, not a UID.",
+    "UID_FORMER_STAFF is a Firestore document only (a disabled account for admin tests); it needs no Auth account."
+  ],
+
+  "settings": {
+    "app": {
+      "businessName": "Test Event Rentals",
+      "currency": "INR",
+      "timezone": "Asia/Kolkata",
+      "updatedBy": "UID_ADMIN",
+      "isTestData": true
+    }
+  },
+
+  "users": {
+    "UID_ADMIN": {
+      "displayName": "Test Admin",
+      "email": "admin@venuevault.test",
+      "role": "admin",
+      "active": true,
+      "isTestData": true
+    },
+    "UID_BOOKING": {
+      "displayName": "Test Booking Staff",
+      "email": "booking@venuevault.test",
+      "role": "booking_staff",
+      "active": true,
+      "isTestData": true
+    },
+    "UID_WAREHOUSE": {
+      "displayName": "Test Warehouse Staff",
+      "email": "warehouse@venuevault.test",
+      "role": "warehouse_staff",
+      "active": true,
+      "isTestData": true
+    },
+    "UID_DISPATCH": {
+      "displayName": "Test Dispatch Staff One",
+      "email": "dispatch@venuevault.test",
+      "role": "dispatch_staff",
+      "active": true,
+      "isTestData": true
+    },
+    "UID_DISPATCH_2": {
+      "displayName": "Test Dispatch Staff Two",
+      "email": "dispatch2@venuevault.test",
+      "role": "dispatch_staff",
+      "active": true,
+      "isTestData": true
+    },
+    "UID_OPERATIONS": {
+      "displayName": "Test Operations Manager",
+      "email": "operations@venuevault.test",
+      "role": "operations_manager",
+      "active": true,
+      "isTestData": true
+    },
+    "UID_FORMER_STAFF": {
+      "displayName": "Test Former Staff",
+      "email": "former.staff@venuevault.test",
+      "role": "booking_staff",
+      "active": false,
+      "isTestData": true
+    }
+  },
+
+  "equipment": {
+    "EQ-001": {
+      "name": "Banquet Table",
+      "category": "Furniture",
+      "details": "6 ft rectangular table",
+      "totalQuantity": 24,
+      "unitsInMaintenance": 0,
+      "dailyRate": 150,
+      "currency": "INR",
+      "status": "active",
+      "isTestData": true
+    },
+    "EQ-002": {
+      "name": "Chiavari Chair",
+      "category": "Seating",
+      "details": "Natural wood, padded seat",
+      "totalQuantity": 120,
+      "unitsInMaintenance": 0,
+      "dailyRate": 40,
+      "currency": "INR",
+      "status": "active",
+      "isTestData": true
+    },
+    "EQ-003": {
+      "name": "LED Uplight",
+      "category": "Lighting",
+      "details": "Wireless RGB uplight",
+      "totalQuantity": 36,
+      "unitsInMaintenance": 0,
+      "dailyRate": 250,
+      "currency": "INR",
+      "status": "active",
+      "isTestData": true
+    },
+    "EQ-004": {
+      "name": "Portable Speaker",
+      "category": "Audio",
+      "details": "Battery-powered PA speaker",
+      "totalQuantity": 8,
+      "unitsInMaintenance": 0,
+      "dailyRate": 1200,
+      "currency": "INR",
+      "status": "active",
+      "isTestData": true
+    },
+    "EQ-005": {
+      "name": "Wireless Microphone",
+      "category": "Audio",
+      "details": "Handheld wireless microphone",
+      "totalQuantity": 20,
+      "unitsInMaintenance": 0,
+      "dailyRate": 300,
+      "currency": "INR",
+      "status": "active",
+      "isTestData": true
+    },
+    "EQ-006": {
+      "name": "Generator 15 kVA",
+      "category": "Power",
+      "details": "Diesel generator with cables",
+      "totalQuantity": 2,
+      "unitsInMaintenance": 1,
+      "dailyRate": 6000,
+      "currency": "INR",
+      "status": "active",
+      "isTestData": true
+    },
+    "EQ-007": {
+      "name": "Portable Air Cooler",
+      "category": "Cooling",
+      "details": "Evaporative floor cooler",
+      "totalQuantity": 4,
+      "unitsInMaintenance": 4,
+      "dailyRate": 800,
+      "currency": "INR",
+      "status": "out_of_service",
+      "isTestData": true
+    }
+  },
+
+  "bookings": {
+    "BK-1001": {
+      "customerName": "Test Customer A",
+      "customerPhone": "+91 00000 00001",
+      "eventName": "Wedding Reception",
+      "venue": "Test Grand Lawn",
+      "startDate": "2026-11-14T10:00:00+05:30",
+      "endDate": "2026-11-15T02:00:00+05:30",
+      "status": "confirmed",
+      "items": [
+        { "equipmentId": "EQ-001", "quantity": 10 },
+        { "equipmentId": "EQ-002", "quantity": 80 },
+        { "equipmentId": "EQ-003", "quantity": 20 },
+        { "equipmentId": "EQ-004", "quantity": 5 }
+      ],
+      "createdBy": "UID_BOOKING",
+      "createdAt": "2026-10-01T11:00:00+05:30",
+      "lastEditedBy": "UID_BOOKING",
+      "lastEditedAt": "2026-10-04T14:30:00+05:30",
+      "isTestData": true
+    },
+    "BK-1002": {
+      "customerName": "Test Customer B",
+      "customerPhone": "+91 00000 00002",
+      "eventName": "Corporate Conference",
+      "venue": "Test Convention Hall",
+      "startDate": "2026-11-14T08:00:00+05:30",
+      "endDate": "2026-11-15T18:00:00+05:30",
+      "status": "confirmed",
+      "items": [
+        { "equipmentId": "EQ-004", "quantity": 5 },
+        { "equipmentId": "EQ-005", "quantity": 8 },
+        { "equipmentId": "EQ-002", "quantity": 30 }
+      ],
+      "createdBy": "UID_BOOKING",
+      "createdAt": "2026-10-03T15:30:00+05:30",
+      "conflictId": "CF-8001",
+      "note": "Overlaps BK-1001: EQ-004 needs 5 + 5 = 10, but only 8 exist. Intended conflict case.",
+      "isTestData": true
+    },
+    "BK-1003": {
+      "customerName": "Test Customer C",
+      "customerPhone": "+91 00000 00003",
+      "eventName": "Birthday Party",
+      "venue": "Test Banquet",
+      "startDate": "2026-11-20T16:00:00+05:30",
+      "endDate": "2026-11-20T23:00:00+05:30",
+      "status": "pending",
+      "items": [
+        { "equipmentId": "EQ-002", "quantity": 40 },
+        { "equipmentId": "EQ-001", "quantity": 6 }
+      ],
+      "createdBy": "UID_BOOKING",
+      "createdAt": "2026-10-05T09:15:00+05:30",
+      "isTestData": true
+    },
+    "BK-1004": {
+      "customerName": "Test Customer D",
+      "customerPhone": "+91 00000 00004",
+      "eventName": "Product Launch",
+      "venue": "Test Exhibition Centre",
+      "startDate": "2026-11-22T09:00:00+05:30",
+      "endDate": "2026-11-22T20:00:00+05:30",
+      "status": "cancelled",
+      "cancellationReason": "Customer postponed the event",
+      "cancelledBy": "UID_BOOKING",
+      "cancelledAt": "2026-10-04T16:20:00+05:30",
+      "items": [
+        { "equipmentId": "EQ-003", "quantity": 30 }
+      ],
+      "createdBy": "UID_BOOKING",
+      "createdAt": "2026-10-02T10:00:00+05:30",
+      "isTestData": true
+    },
+    "BK-1005": {
+      "customerName": "Test Customer E",
+      "customerPhone": "+91 00000 00005",
+      "eventName": "Seminar",
+      "venue": "Test Auditorium",
+      "startDate": "2026-10-02T09:00:00+05:30",
+      "endDate": "2026-10-03T17:00:00+05:30",
+      "status": "completed",
+      "items": [
+        { "equipmentId": "EQ-005", "quantity": 4 },
+        { "equipmentId": "EQ-002", "quantity": 40 }
+      ],
+      "createdBy": "UID_BOOKING",
+      "createdAt": "2026-09-20T12:00:00+05:30",
+      "isTestData": true
+    },
+    "BK-1006": {
+      "customerName": "Test Customer F",
+      "customerPhone": "+91 00000 00006",
+      "eventName": "Gala Dinner",
+      "venue": "Test Heritage Courtyard",
+      "startDate": "2026-11-28T15:00:00+05:30",
+      "endDate": "2026-11-29T01:00:00+05:30",
+      "status": "confirmed",
+      "items": [
+        { "equipmentId": "EQ-001", "quantity": 20 },
+        { "equipmentId": "EQ-002", "quantity": 100 },
+        { "equipmentId": "EQ-006", "quantity": 1 }
+      ],
+      "createdBy": "UID_ADMIN",
+      "createdAt": "2026-10-08T10:45:00+05:30",
+      "approvalId": "AP-7002",
+      "note": "Uses the only generator not in maintenance (1 of 2 owned). Created by Admin to show full-access behaviour.",
+      "isTestData": true
+    }
+  },
+
+  "dispatches": {
+    "DP-2001": {
+      "bookingId": "BK-1001",
+      "type": "delivery",
+      "assignedTo": "UID_DISPATCH",
+      "status": "scheduled",
+      "scheduledFor": "2026-11-14T07:00:00+05:30",
+      "checklist": [
+        { "equipmentId": "EQ-001", "quantity": 10, "itemStatus": "packed" },
+        { "equipmentId": "EQ-002", "quantity": 80, "itemStatus": "packed" },
+        { "equipmentId": "EQ-003", "quantity": 20, "itemStatus": "pending" },
+        { "equipmentId": "EQ-004", "quantity": 5, "itemStatus": "missing" }
+      ],
+      "warehouseUpdatedBy": "UID_WAREHOUSE",
+      "warehouseUpdatedAt": "2026-10-12T17:00:00+05:30",
+      "isTestData": true
+    },
+    "DP-2002": {
+      "bookingId": "BK-1001",
+      "type": "pickup",
+      "assignedTo": "UID_DISPATCH",
+      "status": "scheduled",
+      "scheduledFor": "2026-11-15T09:00:00+05:30",
+      "checklist": [],
+      "isTestData": true
+    },
+    "DP-2003": {
+      "bookingId": "BK-1002",
+      "type": "delivery",
+      "assignedTo": "UID_DISPATCH_2",
+      "status": "in_transit",
+      "scheduledFor": "2026-11-14T06:00:00+05:30",
+      "startedAt": "2026-11-14T06:10:00+05:30",
+      "checklist": [
+        { "equipmentId": "EQ-004", "quantity": 5, "itemStatus": "packed" },
+        { "equipmentId": "EQ-005", "quantity": 8, "itemStatus": "packed" },
+        { "equipmentId": "EQ-002", "quantity": 30, "itemStatus": "packed" }
+      ],
+      "isTestData": true
+    },
+    "DP-2004": {
+      "bookingId": "BK-1005",
+      "type": "pickup",
+      "assignedTo": "UID_DISPATCH",
+      "status": "completed",
+      "scheduledFor": "2026-10-03T18:00:00+05:30",
+      "completedAt": "2026-10-03T19:40:00+05:30",
+      "checklist": [],
+      "isTestData": true
+    },
+    "DP-2005": {
+      "bookingId": "BK-1005",
+      "type": "delivery",
+      "assignedTo": "UID_DISPATCH_2",
+      "status": "delivered",
+      "scheduledFor": "2026-10-02T07:00:00+05:30",
+      "completedAt": "2026-10-02T08:15:00+05:30",
+      "checklist": [],
+      "isTestData": true
+    },
+    "DP-2006": {
+      "bookingId": "BK-1006",
+      "type": "delivery",
+      "assignedTo": "UID_DISPATCH_2",
+      "status": "scheduled",
+      "scheduledFor": "2026-11-28T11:00:00+05:30",
+      "checklist": [
+        { "equipmentId": "EQ-001", "quantity": 20, "itemStatus": "pending" },
+        { "equipmentId": "EQ-002", "quantity": 100, "itemStatus": "pending" },
+        { "equipmentId": "EQ-006", "quantity": 1, "itemStatus": "pending" }
+      ],
+      "isTestData": true
+    },
+    "DP-2007": {
+      "bookingId": "BK-1002",
+      "type": "pickup",
+      "assignedTo": "UID_DISPATCH_2",
+      "status": "failed",
+      "scheduledFor": "2026-11-15T20:00:00+05:30",
+      "issueReportId": "IS-6001",
+      "checklist": [],
+      "note": "Future-dated failed pickup, used only to test how failures are shown and reviewed.",
+      "isTestData": true
+    }
+  },
+
+  "returns": {
+    "RT-3001": {
+      "bookingId": "BK-1005",
+      "recordedBy": "UID_WAREHOUSE",
+      "recordedAt": "2026-10-04T10:00:00+05:30",
+      "items": [
+        { "equipmentId": "EQ-005", "rented": 4, "returnedGood": 4, "damaged": 0, "missing": 0 },
+        { "equipmentId": "EQ-002", "rented": 40, "returnedGood": 38, "damaged": 1, "missing": 1 }
+      ],
+      "isTestData": true
+    }
+  },
+
+  "maintenance": {
+    "MT-4001": {
+      "equipmentId": "EQ-006",
+      "quantity": 1,
+      "status": "in_repair",
+      "note": "Fuel pump replacement (test record)",
+      "openedBy": "UID_WAREHOUSE",
+      "openedAt": "2026-10-06T14:00:00+05:30",
+      "isTestData": true
+    },
+    "MT-4002": {
+      "equipmentId": "EQ-007",
+      "quantity": 4,
+      "status": "awaiting_parts",
+      "note": "Cooling units out of service (test record)",
+      "openedBy": "UID_WAREHOUSE",
+      "openedAt": "2026-09-28T10:30:00+05:30",
+      "isTestData": true
+    }
+  },
+
+  "conflicts": {
+    "CF-8001": {
+      "type": "equipment_overlap",
+      "equipmentId": "EQ-004",
+      "bookingIds": ["BK-1001", "BK-1002"],
+      "quantityRequested": 10,
+      "quantityOwned": 8,
+      "status": "open",
+      "detectedBy": "system",
+      "detectedAt": "2026-10-03T15:30:05+05:30",
+      "approvalId": "AP-7001",
+      "isTestData": true
+    }
+  },
+
+  "approvals": {
+    "AP-7001": {
+      "type": "conflict_resolution",
+      "targetId": "CF-8001",
+      "requestedBy": "UID_BOOKING",
+      "requestedAt": "2026-10-03T15:45:00+05:30",
+      "status": "pending",
+      "isTestData": true
+    },
+    "AP-7002": {
+      "type": "exception",
+      "targetId": "BK-1006",
+      "requestedBy": "UID_ADMIN",
+      "requestedAt": "2026-10-08T10:50:00+05:30",
+      "status": "approved",
+      "decidedBy": "UID_OPERATIONS",
+      "decidedAt": "2026-10-08T12:10:00+05:30",
+      "decisionNote": "Generator is the last available unit; approved with backup on standby.",
+      "isTestData": true
+    },
+    "AP-7003": {
+      "type": "exception",
+      "targetId": "BK-1003",
+      "requestedBy": "UID_BOOKING",
+      "requestedAt": "2026-10-09T11:00:00+05:30",
+      "status": "rejected",
+      "decidedBy": "UID_OPERATIONS",
+      "decidedAt": "2026-10-09T15:20:00+05:30",
+      "decisionNote": "Request to add 30 more chairs exceeds stock for that date.",
+      "isTestData": true
+    }
+  },
+
+  "issueReports": {
+    "IS-6001": {
+      "type": "failed_pickup",
+      "relatedTo": "DP-2007",
+      "reportedBy": "UID_DISPATCH_2",
+      "reportedAt": "2026-11-15T20:30:00+05:30",
+      "description": "Venue was locked and the contact person was unreachable.",
+      "status": "open",
+      "isTestData": true
+    },
+    "IS-6002": {
+      "type": "damaged_equipment",
+      "relatedTo": "RT-3001",
+      "reportedBy": "UID_WAREHOUSE",
+      "reportedAt": "2026-10-04T10:15:00+05:30",
+      "description": "One chair returned damaged and one missing after the seminar.",
+      "status": "open",
+      "isTestData": true
+    }
+  },
+
+  "auditLogs": {
+    "AL-5001": {
+      "action": "booking_created",
+      "targetId": "BK-1001",
+      "performedBy": "UID_BOOKING",
+      "timestamp": "2026-10-01T11:00:00+05:30",
+      "isTestData": true
+    },
+    "AL-5002": {
+      "action": "booking_edited",
+      "targetId": "BK-1001",
+      "performedBy": "UID_BOOKING",
+      "timestamp": "2026-10-04T14:30:00+05:30",
+      "isTestData": true
+    },
+    "AL-5003": {
+      "action": "booking_cancelled",
+      "targetId": "BK-1004",
+      "performedBy": "UID_BOOKING",
+      "timestamp": "2026-10-04T16:20:00+05:30",
+      "isTestData": true
+    },
+    "AL-5004": {
+      "action": "conflict_detected",
+      "targetId": "CF-8001",
+      "performedBy": "system",
+      "timestamp": "2026-10-03T15:30:05+05:30",
+      "isTestData": true
+    },
+    "AL-5005": {
+      "action": "dispatch_status_updated",
+      "targetId": "DP-2004",
+      "performedBy": "UID_DISPATCH",
+      "timestamp": "2026-10-03T19:40:00+05:30",
+      "isTestData": true
+    },
+    "AL-5006": {
+      "action": "return_recorded",
+      "targetId": "RT-3001",
+      "performedBy": "UID_WAREHOUSE",
+      "timestamp": "2026-10-04T10:00:00+05:30",
+      "isTestData": true
+    },
+    "AL-5007": {
+      "action": "checklist_item_marked_missing",
+      "targetId": "DP-2001",
+      "performedBy": "UID_WAREHOUSE",
+      "timestamp": "2026-10-12T17:00:00+05:30",
+      "isTestData": true
+    },
+    "AL-5008": {
+      "action": "approval_granted",
+      "targetId": "AP-7002",
+      "performedBy": "UID_OPERATIONS",
+      "timestamp": "2026-10-08T12:10:00+05:30",
+      "isTestData": true
+    },
+    "AL-5009": {
+      "action": "booking_created",
+      "targetId": "BK-1006",
+      "performedBy": "UID_ADMIN",
+      "timestamp": "2026-10-08T10:45:00+05:30",
+      "isTestData": true
+    },
+    "AL-5010": {
+      "action": "user_role_changed",
+      "targetId": "UID_FORMER_STAFF",
+      "performedBy": "UID_ADMIN",
+      "timestamp": "2026-10-10T09:00:00+05:30",
+      "isTestData": true
+    },
+    "AL-5011": {
+      "action": "user_disabled",
+      "targetId": "UID_FORMER_STAFF",
+      "performedBy": "UID_ADMIN",
+      "timestamp": "2026-10-10T09:05:00+05:30",
+      "isTestData": true
+    }
+  }
+}

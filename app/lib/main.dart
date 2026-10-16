@@ -3,9 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
-
-const demoEmail = 'demo@venuevault.test';
-const demoPassword = 'VenueVault123!';
+import 'new_booking_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -104,15 +102,6 @@ class _AuthPageState extends State<AuthPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_isSignUp &&
-        _emailController.text.trim().toLowerCase() == demoEmail &&
-        _passwordController.text == demoPassword) {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomePage(isDemo: true)),
-      );
-      return;
-    }
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -137,12 +126,6 @@ class _AuthPageState extends State<AuthPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _useDemoAccount() {
-    _emailController.text = demoEmail;
-    _passwordController.text = demoPassword;
-    setState(() => _errorMessage = null);
   }
 
   String _authErrorMessage(String code) {
@@ -362,23 +345,6 @@ class _AuthPageState extends State<AuthPage> {
                   ),
                 ],
               ),
-              const Divider(height: 24),
-              OutlinedButton.icon(
-                onPressed: _isSignUp ? null : _useDemoAccount,
-                icon: const Icon(Icons.science_outlined),
-                label: const Text('Use test account'),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Test account: demo@venuevault.test',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Color(0xff6b7280)),
-              ),
-              const Text(
-                'Password: VenueVault123!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Color(0xff6b7280)),
-              ),
             ],
           ),
         ),
@@ -388,10 +354,9 @@ class _AuthPageState extends State<AuthPage> {
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, this.user, this.isDemo = false});
+  const HomePage({super.key, this.user});
 
   final User? user;
-  final bool isDemo;
 
   @override
   Widget build(BuildContext context) {
@@ -399,20 +364,11 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('VenueVault'),
         actions: [
-          if (isDemo)
-            IconButton(
-              tooltip: 'Sign out',
-              onPressed: () => Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const AuthPage()),
-              ),
-              icon: const Icon(Icons.logout),
-            ),
-          if (!isDemo)
-            IconButton(
-              tooltip: 'Sign out',
-              onPressed: () => FirebaseAuth.instance.signOut(),
-              icon: const Icon(Icons.logout),
-            ),
+          IconButton(
+            tooltip: 'Sign out',
+            onPressed: () => FirebaseAuth.instance.signOut(),
+            icon: const Icon(Icons.logout),
+          ),
         ],
       ),
       body: SafeArea(
@@ -486,7 +442,13 @@ class HomePage extends StatelessWidget {
                 icon: Icons.add_circle_outline,
                 title: 'Create booking',
                 subtitle: 'Reserve equipment for a new event',
-                onTap: () => _showComingSoon(context, 'Create booking'),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NewBookingPage(),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 10),
               _ActionTile(
