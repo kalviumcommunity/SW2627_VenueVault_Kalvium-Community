@@ -3,6 +3,22 @@
 VenueVault is a Flutter mobile application backed by Firebase for event
 equipment booking, inventory, dispatch, and return tracking.
 
+## Key Features
+
+- **Equipment Inventory Tracking**: Monitor real-time availability, stock counts, and categories (audio, lighting, staging, power, cables).
+- **Booking & Conflict Prevention**: Validate overlapping date ranges and equipment reservations before confirmation to prevent double-booking.
+- **Dispatch Management**: View daily dispatches, manage packing checklists, and update item status from warehouse to venue delivery.
+- **Return & Inspection Tracking**: Track returned gear, record damages or missing accessories, and restore inventory back to available stock.
+- **Secure Multi-Role Access**: Backed by Firebase Authentication and Firestore security rules to protect operational and client data.
+
+## Tech Stack
+
+- **Frontend**: Flutter (Dart), Material 3 design
+- **Backend**: Firebase Cloud Functions (TypeScript / Node.js 24)
+- **Database**: Cloud Firestore
+- **Authentication**: Firebase Auth
+- **Hosting & Emulators**: Firebase Hosting and Firebase Local Emulator Suite
+
 ## Repository structure
 
 ```text
@@ -26,7 +42,17 @@ operations and must not be moved into `lib/`.
 
 ## Local setup
 
-Install Flutter and the FlutterFire CLI first. From the repository root run:
+### Prerequisites
+
+Ensure you have the following installed:
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.x)
+- [Node.js](https://nodejs.org/) (v20+) & npm
+- [Firebase CLI](https://firebase.google.com/docs/cli) (`npm install -g firebase-tools`)
+- [FlutterFire CLI](https://firebase.flutter.dev/docs/cli/) (`dart pub global activate flutterfire_cli`)
+
+### Mobile App Setup
+
+From the repository root run:
 
 ```powershell
 flutter create .
@@ -40,6 +66,14 @@ directories. `flutterfire configure` registers the mobile apps and generates
 After that, update `lib/main.dart` to use the generated
 `DefaultFirebaseOptions.currentPlatform` when web support is enabled.
 
+Run the mobile app with:
+
+```powershell
+flutter run
+```
+
+### Backend Setup (Cloud Functions)
+
 Install and build the backend separately:
 
 ```powershell
@@ -49,11 +83,20 @@ npm run lint
 npm run build
 ```
 
-Run the mobile app with:
+### Running with Firebase Local Emulators
+
+For offline testing and local backend development, you can run the Firebase Emulator Suite:
 
 ```powershell
-flutter run
+firebase emulators:start
 ```
+
+This starts local emulators for:
+- **Authentication**: `localhost:9099`
+- **Cloud Functions**: `localhost:5001`
+- **Cloud Firestore**: `localhost:8080`
+- **Hosting**: `localhost:5000`
+- **Emulator Suite UI**: `http://localhost:4000`
 
 The Firebase project is already selected in `.firebaserc`. Do not commit
 secrets, local Firebase credentials, or generated build output.
