@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
+import 'equipment_catalog_page.dart';
 import 'new_booking_page.dart';
 
 Future<void> main() async {
@@ -455,19 +456,19 @@ class HomePage extends StatelessWidget {
                 icon: Icons.inventory_2_outlined,
                 title: 'View inventory',
                 subtitle: 'Check availability and stock levels',
-                onTap: () => _showComingSoon(context, 'View inventory'),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const EquipmentCatalogPage(),
+                    ),
+                  );
+                },
               ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  static void _showComingSoon(BuildContext context, String action) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$action will be available soon.')));
   }
 }
 
