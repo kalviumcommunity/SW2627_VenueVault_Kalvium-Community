@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class NewBookingPage extends StatefulWidget {
@@ -10,6 +11,23 @@ class NewBookingPage extends StatefulWidget {
 class _NewBookingPageState extends State<NewBookingPage> {
   DateTimeRange? _selectedDates;
   final Set<String> _selectedInventory = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchText = '';
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _equipmentStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _equipmentStream = FirebaseFirestore.instance
+        .collection('equipment')
+        .snapshots();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _selectDates() async {
     final now = DateTime.now();
@@ -54,11 +72,16 @@ class _NewBookingPageState extends State<NewBookingPage> {
             child: _selectedDates == null
                 ? const _InventoryHiddenState()
                 : _InventoryReadyState(
+                    equipmentStream: _equipmentStream,
                     selectedInventory: _selectedInventory,
-                    onToggleItem: (itemName) {
+                    searchController: _searchController,
+                    searchText: _searchText,
+                    onSearchChanged: (value) =>
+                        setState(() => _searchText = value.trim()),
+                    onToggleItem: (equipmentId) {
                       setState(() {
-                        if (!_selectedInventory.add(itemName)) {
-                          _selectedInventory.remove(itemName);
+                        if (!_selectedInventory.add(equipmentId)) {
+                          _selectedInventory.remove(equipmentId);
                         }
                       });
                     },
@@ -208,50 +231,23 @@ class _InventoryHiddenState extends StatelessWidget {
 
 class _InventoryReadyState extends StatelessWidget {
   const _InventoryReadyState({
+    required this.equipmentStream,
     required this.selectedInventory,
+    required this.searchController,
+    required this.searchText,
+    required this.onSearchChanged,
     required this.onToggleItem,
   });
 
+  final Stream<QuerySnapshot<Map<String, dynamic>>> equipmentStream;
   final Set<String> selectedInventory;
+  final TextEditingController searchController;
+  final String searchText;
+  final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onToggleItem;
 
   @override
   Widget build(BuildContext context) {
-    final inventory = [
-      (
-        name: 'Banquet Table',
-        category: 'Furniture',
-        details: '6 ft rectangular table',
-        available: 24,
-        icon: Icons.table_restaurant_outlined,
-        color: const Color(0xff4f46e5),
-      ),
-      (
-        name: 'Chiavari Chair',
-        category: 'Seating',
-        details: 'Natural wood, padded seat',
-        available: 120,
-        icon: Icons.chair_outlined,
-        color: const Color(0xff0f766e),
-      ),
-      (
-        name: 'LED Uplight',
-        category: 'Lighting',
-        details: 'Wireless RGB uplight',
-        available: 36,
-        icon: Icons.lightbulb_outline_rounded,
-        color: const Color(0xffc2410c),
-      ),
-      (
-        name: 'Portable Speaker',
-        category: 'Audio',
-        details: 'Battery-powered PA speaker',
-        available: 8,
-        icon: Icons.speaker_group_outlined,
-        color: const Color(0xff7e22ce),
-      ),
-    ];
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
@@ -268,7 +264,7 @@ class _InventoryReadyState extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Reserve what you need for your selected dates.',
+                    'Equipment currently marked available in the catalog.',
                     style: Theme.of(context).textTheme.bodySmall
                         ?.copyWith(color: Colors.grey.shade600),
                   ),
@@ -286,6 +282,8 @@ class _InventoryReadyState extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         TextField(
+          controller: searchController,
+          onChanged: onSearchChanged,
           decoration: InputDecoration(
             hintText: 'Search equipment',
             prefixIcon: const Icon(Icons.search),
@@ -297,22 +295,160 @@ class _InventoryReadyState extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        ...inventory.map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _InventoryCard(
-              name: item.name,
-              category: item.category,
-              details: item.details,
-              available: item.available,
-              icon: item.icon,
-              color: item.color,
-              isSelected: selectedInventory.contains(item.name),
-              onToggle: () => onToggleItem(item.name),
-            ),
-          ),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: equipmentStream,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return _InventoryMessage(
+                icon: Icons.cloud_off_outlined,
+                title: 'Could not load equipment',
+                message: 'Check Firestore access rules and your internet connection, then try again.',
+              );
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final query = searchText.toLowerCase();
+            final equipment =
+                (snapshot.data?.docs ?? []).where((document) {
+                  final data = document.data();
+                  final status = (data['status'] as String? ?? 'Available')
+                      .toLowerCase();
+                  final available =
+                      (data['availableQuantity'] as num?)?.toInt() ?? 0;
+                  final unavailableStatuses = {
+                    'damaged',
+                    'under maintenance',
+                    'retired',
+                  };
+                  if (available <= 0 || unavailableStatuses.contains(status)) {
+                    return false;
+                  }
+                  if (query.isEmpty) return true;
+                  return (data['name'] as String? ?? '').toLowerCase().contains(
+                        query,
+                      ) ||
+                      (data['category'] as String? ?? '')
+                          .toLowerCase()
+                          .contains(query) ||
+                      (data['description'] as String? ?? '')
+                          .toLowerCase()
+                          .contains(query);
+                }).toList()..sort((a, b) {
+                  final aName = a.data()['name'] as String? ?? '';
+                  final bName = b.data()['name'] as String? ?? '';
+                  return aName.toLowerCase().compareTo(bName.toLowerCase());
+                });
+
+            if (equipment.isEmpty) {
+              return _InventoryMessage(
+                icon: query.isEmpty
+                    ? Icons.inventory_2_outlined
+                    : Icons.search_off,
+                title: query.isEmpty
+                    ? 'No available equipment'
+                    : 'No matching equipment',
+                message: query.isEmpty
+                    ? 'Add equipment to the catalog or update its available quantity.'
+                    : 'Try another search term.',
+              );
+            }
+
+            return Column(
+              children: equipment.map((document) {
+                final data = document.data();
+                final name = data['name'] as String? ?? 'Unnamed equipment';
+                final category = data['category'] as String? ?? 'Other';
+                final description = data['description'] as String? ?? '';
+                final available =
+                    (data['availableQuantity'] as num?)?.toInt() ?? 0;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _InventoryCard(
+                    name: name,
+                    category: category,
+                    details: description.isEmpty
+                        ? (data['warehouseLocation'] as String? ?? '')
+                        : description,
+                    available: available,
+                    icon: _iconForCategory(category),
+                    color: _colorForCategory(category),
+                    isSelected: selectedInventory.contains(document.id),
+                    onToggle: () => onToggleItem(document.id),
+                  ),
+                );
+              }).toList(),
+            );
+          },
         ),
       ],
+    );
+  }
+
+  IconData _iconForCategory(String category) {
+    final normalized = category.toLowerCase();
+    if (normalized.contains('speaker') ||
+        normalized.contains('audio') ||
+        normalized.contains('microphone') ||
+        normalized.contains('amplifier')) {
+      return Icons.speaker_group_outlined;
+    }
+    if (normalized.contains('light')) return Icons.lightbulb_outline_rounded;
+    if (normalized.contains('chair') ||
+        normalized.contains('table') ||
+        normalized.contains('sofa')) {
+      return Icons.chair_outlined;
+    }
+    if (normalized.contains('projector')) return Icons.videocam_outlined;
+    if (normalized.contains('generator')) return Icons.bolt_outlined;
+    return Icons.inventory_2_outlined;
+  }
+
+  Color _colorForCategory(String category) {
+    final normalized = category.toLowerCase();
+    if (normalized.contains('audio') || normalized.contains('speaker')) {
+      return const Color(0xff7e22ce);
+    }
+    if (normalized.contains('light')) return const Color(0xffc2410c);
+    if (normalized.contains('chair') || normalized.contains('table')) {
+      return const Color(0xff0f766e);
+    }
+    return const Color(0xff4f46e5);
+  }
+}
+
+class _InventoryMessage extends StatelessWidget {
+  const _InventoryMessage({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 18),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: Colors.grey.shade500),
+          const SizedBox(height: 12),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+        ],
+      ),
     );
   }
 }
