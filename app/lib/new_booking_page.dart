@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'availability_engine.dart';
 
 class NewBookingPage extends StatefulWidget {
   const NewBookingPage({super.key});
@@ -14,12 +15,16 @@ class _NewBookingPageState extends State<NewBookingPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchText = '';
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _equipmentStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _bookingStream;
 
   @override
   void initState() {
     super.initState();
     _equipmentStream = FirebaseFirestore.instance
         .collection('equipment')
+        .snapshots();
+    _bookingStream = FirebaseFirestore.instance
+        .collection('bookings')
         .snapshots();
   }
 
@@ -73,6 +78,8 @@ class _NewBookingPageState extends State<NewBookingPage> {
                 ? const _InventoryHiddenState()
                 : _InventoryReadyState(
                     equipmentStream: _equipmentStream,
+                    bookingStream: _bookingStream,
+                    selectedDates: _selectedDates!,
                     selectedInventory: _selectedInventory,
                     searchController: _searchController,
                     searchText: _searchText,
@@ -232,6 +239,8 @@ class _InventoryHiddenState extends StatelessWidget {
 class _InventoryReadyState extends StatelessWidget {
   const _InventoryReadyState({
     required this.equipmentStream,
+    required this.bookingStream,
+    required this.selectedDates,
     required this.selectedInventory,
     required this.searchController,
     required this.searchText,
@@ -240,6 +249,8 @@ class _InventoryReadyState extends StatelessWidget {
   });
 
   final Stream<QuerySnapshot<Map<String, dynamic>>> equipmentStream;
+  final Stream<QuerySnapshot<Map<String, dynamic>>> bookingStream;
+  final DateTimeRange selectedDates;
   final Set<String> selectedInventory;
   final TextEditingController searchController;
   final String searchText;
@@ -264,7 +275,7 @@ class _InventoryReadyState extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Equipment currently marked available in the catalog.',
+                    'Stock remaining after reservations for the selected dates.',
                     style: Theme.of(context).textTheme.bodySmall
                         ?.copyWith(color: Colors.grey.shade600),
                   ),
@@ -312,20 +323,33 @@ class _InventoryReadyState extends StatelessWidget {
               );
             }
 
-            final query = searchText.toLowerCase();
-            final equipment =
-                (snapshot.data?.docs ?? []).where((document) {
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: bookingStream,
+              builder: (context, bookingSnapshot) {
+                if (bookingSnapshot.hasError) {
+                  return _InventoryMessage(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Could not check reservations',
+                    message: 'Check Firestore access rules and try again.',
+                  );
+                }
+                if (bookingSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final docs = snapshot.data?.docs ?? [];
+                final availability = AvailabilityEngine.calculate(
+                  dates: selectedDates,
+                  equipment: docs,
+                  bookings: bookingSnapshot.data?.docs ?? [],
+                );
+                final query = searchText.toLowerCase();
+                final equipment = docs.where((document) {
                   final data = document.data();
-                  final status = (data['status'] as String? ?? 'Available')
-                      .toLowerCase();
-                  final available =
-                      (data['availableQuantity'] as num?)?.toInt() ?? 0;
-                  final unavailableStatuses = {
-                    'damaged',
-                    'under maintenance',
-                    'retired',
-                  };
-                  if (available <= 0 || unavailableStatuses.contains(status)) {
+                  final available = availability[document.id] ?? 0;
+                  if (available <= 0) {
                     return false;
                   }
                   if (query.isEmpty) return true;
@@ -364,8 +388,7 @@ class _InventoryReadyState extends StatelessWidget {
                 final name = data['name'] as String? ?? 'Unnamed equipment';
                 final category = data['category'] as String? ?? 'Other';
                 final description = data['description'] as String? ?? '';
-                final available =
-                    (data['availableQuantity'] as num?)?.toInt() ?? 0;
+                final available = availability[document.id] ?? 0;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _InventoryCard(
@@ -382,6 +405,8 @@ class _InventoryReadyState extends StatelessWidget {
                   ),
                 );
               }).toList(),
+            );
+              },
             );
           },
         ),
