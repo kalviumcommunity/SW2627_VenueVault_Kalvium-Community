@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'equipment_catalog_page.dart';
 import 'new_booking_page.dart';
+import 'booking_management_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -460,6 +461,19 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const EquipmentCatalogPage(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _ActionTile(
+                icon: Icons.calendar_month_outlined,
+                title: 'Manage bookings',
+                subtitle: 'View, edit, or cancel event reservations',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const BookingManagementPage(),
                     ),
                   );
                 },
