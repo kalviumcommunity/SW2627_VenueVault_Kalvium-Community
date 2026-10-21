@@ -14,12 +14,14 @@ class AvailabilityEngine {
     required DateTimeRange dates,
     required Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> equipment,
     required Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> bookings,
+    String? ignoreBookingId,
   }) {
     final reserved = <String, int>{};
     final requestedStart = _dateOnly(dates.start);
     final requestedEnd = _dateOnly(dates.end);
 
     for (final booking in bookings) {
+      if (booking.id == ignoreBookingId) continue;
       final data = booking.data();
       final status = (data['status'] as String? ?? '').toLowerCase();
       if (const {'cancelled', 'rejected', 'declined'}.contains(status)) {

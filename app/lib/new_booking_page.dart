@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'availability_engine.dart';
 
 class NewBookingPage extends StatefulWidget {
-  const NewBookingPage({super.key});
+  const NewBookingPage({super.key, this.initialBookingId, this.initialBooking});
+
+  final String? initialBookingId;
+  final Map<String, dynamic>? initialBooking;
 
   @override
   State<NewBookingPage> createState() => _NewBookingPageState();
@@ -11,15 +14,57 @@ class NewBookingPage extends StatefulWidget {
 
 class _NewBookingPageState extends State<NewBookingPage> {
   DateTimeRange? _selectedDates;
-  final Set<String> _selectedInventory = {};
+  final Map<String, int> _selectedInventory = {};
   final TextEditingController _searchController = TextEditingController();
+  late final TextEditingController _customerController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _eventController;
+  late final TextEditingController _venueController;
+  late final TextEditingController _staffController;
+  late final TextEditingController _notesController;
   String _searchText = '';
+  bool _saving = false;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _equipmentStream;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _bookingStream;
 
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialBooking ?? {};
+    _customerController = TextEditingController(
+      text: initial['customerName'] as String? ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: initial['customerPhone'] as String? ?? '',
+    );
+    _eventController = TextEditingController(
+      text: initial['eventName'] as String? ?? '',
+    );
+    _venueController = TextEditingController(
+      text: initial['venue'] as String? ?? '',
+    );
+    _staffController = TextEditingController(
+      text: initial['staffName'] as String? ?? '',
+    );
+    _notesController = TextEditingController(
+      text: initial['notes'] as String? ?? '',
+    );
+    final start = _asDate(initial['startDate']);
+    final end = _asDate(initial['endDate']);
+    if (start != null && end != null) {
+      _selectedDates = DateTimeRange(start: start, end: end);
+    }
+    final storedItems = initial['items'];
+    if (storedItems is List) {
+      for (final raw in storedItems) {
+        if (raw is! Map) continue;
+        final id = (raw['equipmentId'] ?? raw['id'])?.toString();
+        final quantity = raw['quantity'];
+        if (id != null && quantity is num && quantity > 0) {
+          _selectedInventory[id] = quantity.toInt();
+        }
+      }
+    }
     _equipmentStream = FirebaseFirestore.instance
         .collection('equipment')
         .snapshots();
@@ -31,14 +76,118 @@ class _NewBookingPageState extends State<NewBookingPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _customerController.dispose();
+    _phoneController.dispose();
+    _eventController.dispose();
+    _venueController.dispose();
+    _staffController.dispose();
+    _notesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveBooking() async {
+    if (_selectedDates == null || _selectedInventory.isEmpty) {
+      _message('Select event dates and at least one equipment item.');
+      return;
+    }
+    if (_customerController.text.trim().isEmpty ||
+        _eventController.text.trim().isEmpty ||
+        _venueController.text.trim().isEmpty ||
+        _staffController.text.trim().isEmpty) {
+      _message('Customer, event, venue, and assigned staff are required.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final db = FirebaseFirestore.instance;
+      final equipmentSnapshot = await db.collection('equipment').get();
+      final bookingsSnapshot = await db.collection('bookings').get();
+      final availability = AvailabilityEngine.calculate(
+        dates: _selectedDates!,
+        equipment: equipmentSnapshot.docs,
+        bookings: bookingsSnapshot.docs,
+        ignoreBookingId: widget.initialBookingId,
+      );
+      final shortfalls = <String>[];
+      for (final entry in _selectedInventory.entries) {
+        final available = availability[entry.key] ?? 0;
+        if (entry.value > available) {
+          final item = equipmentSnapshot.docs
+              .where((doc) => doc.id == entry.key)
+              .toList();
+          shortfalls.add(
+            '${item.isEmpty ? entry.key : item.first.data()['name']}: '
+            '$available available',
+          );
+        }
+      }
+      if (shortfalls.isNotEmpty) {
+        _message('Not enough stock for the selected dates. ${shortfalls.join('; ')}');
+        return;
+      }
+      final items = _selectedInventory.entries.map((entry) {
+        final document = equipmentSnapshot.docs.firstWhere(
+          (doc) => doc.id == entry.key,
+        );
+        return {
+          'equipmentId': entry.key,
+          'name': document.data()['name'] as String? ?? 'Equipment',
+          'quantity': entry.value,
+        };
+      }).toList();
+      final data = <String, dynamic>{
+        'customerName': _customerController.text.trim(),
+        'customerPhone': _phoneController.text.trim(),
+        'eventName': _eventController.text.trim(),
+        'venue': _venueController.text.trim(),
+        'staffName': _staffController.text.trim(),
+        'notes': _notesController.text.trim(),
+        'startDate': Timestamp.fromDate(_dateOnly(_selectedDates!.start)),
+        'endDate': Timestamp.fromDate(_dateOnly(_selectedDates!.end)),
+        'items': items,
+        'status': widget.initialBooking?['status'] ?? 'confirmed',
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (widget.initialBookingId == null) {
+        data['createdAt'] = FieldValue.serverTimestamp();
+        await db.collection('bookings').add(data);
+      } else {
+        await db.collection('bookings').doc(widget.initialBookingId).update(data);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.initialBookingId == null
+                ? 'Booking created.'
+                : 'Booking updated.'),
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      if (mounted) _message('Could not save booking: $error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _message(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _selectDates() async {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final firstDate = _selectedDates != null &&
+            _selectedDates!.start.isBefore(today)
+        ? _selectedDates!.start
+        : today;
     final selectedDates = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(now.year, now.month, now.day),
+      firstDate: firstDate,
       lastDate: DateTime(now.year + 2, 12, 31),
       initialDateRange: _selectedDates,
       helpText: 'Select event dates',
@@ -54,16 +203,18 @@ class _NewBookingPageState extends State<NewBookingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'New Booking',
+        title: Text(
+          widget.initialBookingId == null ? 'New Booking' : 'Edit Booking',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.shopping_cart_outlined),
-            tooltip: 'Booking cart',
-          ),
+          if (_selectedInventory.isNotEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Chip(label: Text('${_selectedInventory.length} items')),
+              ),
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -81,20 +232,47 @@ class _NewBookingPageState extends State<NewBookingPage> {
                     bookingStream: _bookingStream,
                     selectedDates: _selectedDates!,
                     selectedInventory: _selectedInventory,
+                    customerController: _customerController,
+                    phoneController: _phoneController,
+                    eventController: _eventController,
+                    venueController: _venueController,
+                    staffController: _staffController,
+                    notesController: _notesController,
+                    ignoreBookingId: widget.initialBookingId,
                     searchController: _searchController,
                     searchText: _searchText,
                     onSearchChanged: (value) =>
                         setState(() => _searchText = value.trim()),
-                    onToggleItem: (equipmentId) {
+                    onQuantityChanged: (equipmentId, quantity) {
                       setState(() {
-                        if (!_selectedInventory.add(equipmentId)) {
+                        if (quantity <= 0) {
                           _selectedInventory.remove(equipmentId);
+                        } else {
+                          _selectedInventory[equipmentId] = quantity;
                         }
                       });
                     },
                   ),
           ),
         ],
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: FilledButton.icon(
+          onPressed: _saving ? null : _saveBooking,
+          icon: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save_outlined),
+          label: Text(_saving
+              ? 'Saving…'
+              : widget.initialBookingId == null
+                  ? 'Create booking'
+                  : 'Save changes'),
+        ),
       ),
     );
   }
@@ -242,26 +420,58 @@ class _InventoryReadyState extends StatelessWidget {
     required this.bookingStream,
     required this.selectedDates,
     required this.selectedInventory,
+    required this.customerController,
+    required this.phoneController,
+    required this.eventController,
+    required this.venueController,
+    required this.staffController,
+    required this.notesController,
+    required this.ignoreBookingId,
     required this.searchController,
     required this.searchText,
     required this.onSearchChanged,
-    required this.onToggleItem,
+    required this.onQuantityChanged,
   });
 
   final Stream<QuerySnapshot<Map<String, dynamic>>> equipmentStream;
   final Stream<QuerySnapshot<Map<String, dynamic>>> bookingStream;
   final DateTimeRange selectedDates;
-  final Set<String> selectedInventory;
+  final Map<String, int> selectedInventory;
+  final TextEditingController customerController;
+  final TextEditingController phoneController;
+  final TextEditingController eventController;
+  final TextEditingController venueController;
+  final TextEditingController staffController;
+  final TextEditingController notesController;
+  final String? ignoreBookingId;
   final TextEditingController searchController;
   final String searchText;
   final ValueChanged<String> onSearchChanged;
-  final ValueChanged<String> onToggleItem;
+  final void Function(String equipmentId, int quantity) onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
+        Text('Booking details',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            )),
+        const SizedBox(height: 12),
+        _bookingField(customerController, 'Customer name *', Icons.person_outline),
+        const SizedBox(height: 10),
+        _bookingField(phoneController, 'Customer phone', Icons.phone_outlined,
+            keyboardType: TextInputType.phone),
+        const SizedBox(height: 10),
+        _bookingField(eventController, 'Event name *', Icons.event_outlined),
+        const SizedBox(height: 10),
+        _bookingField(venueController, 'Venue *', Icons.place_outlined),
+        const SizedBox(height: 10),
+        _bookingField(staffController, 'Assigned staff *', Icons.badge_outlined),
+        const SizedBox(height: 10),
+        _bookingField(notesController, 'Notes', Icons.notes_outlined, maxLines: 2),
+        const SizedBox(height: 24),
         Row(
           children: [
             Expanded(
@@ -285,7 +495,7 @@ class _InventoryReadyState extends StatelessWidget {
             if (selectedInventory.isNotEmpty)
               Chip(
                 avatar: const Icon(Icons.check_circle_outline, size: 18),
-                label: Text('${selectedInventory.length} added'),
+                label: Text('${selectedInventory.length} selected'),
                 backgroundColor: const Color(0xffe0e7ff),
                 side: BorderSide.none,
               ),
@@ -344,6 +554,7 @@ class _InventoryReadyState extends StatelessWidget {
                   dates: selectedDates,
                   equipment: docs,
                   bookings: bookingSnapshot.data?.docs ?? [],
+                  ignoreBookingId: ignoreBookingId,
                 );
                 final query = searchText.toLowerCase();
                 final equipment = docs.where((document) {
@@ -400,8 +611,9 @@ class _InventoryReadyState extends StatelessWidget {
                     available: available,
                     icon: _iconForCategory(category),
                     color: _colorForCategory(category),
-                    isSelected: selectedInventory.contains(document.id),
-                    onToggle: () => onToggleItem(document.id),
+                    quantity: selectedInventory[document.id] ?? 0,
+                    onQuantityChanged: (quantity) =>
+                        onQuantityChanged(document.id, quantity),
                   ),
                 );
               }).toList(),
@@ -413,6 +625,25 @@ class _InventoryReadyState extends StatelessWidget {
       ],
     );
   }
+
+  Widget _bookingField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) =>
+      TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+      );
 
   IconData _iconForCategory(String category) {
     final normalized = category.toLowerCase();
@@ -486,8 +717,8 @@ class _InventoryCard extends StatelessWidget {
     required this.available,
     required this.icon,
     required this.color,
-    required this.isSelected,
-    required this.onToggle,
+    required this.quantity,
+    required this.onQuantityChanged,
   });
 
   final String name;
@@ -496,8 +727,10 @@ class _InventoryCard extends StatelessWidget {
   final int available;
   final IconData icon;
   final Color color;
-  final bool isSelected;
-  final VoidCallback onToggle;
+  final int quantity;
+  final ValueChanged<int> onQuantityChanged;
+
+  bool get isSelected => quantity > 0;
 
   @override
   Widget build(BuildContext context) {
@@ -555,17 +788,33 @@ class _InventoryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
-              onPressed: onToggle,
-              tooltip: isSelected ? 'Remove from booking' : 'Add to booking',
-              icon: Icon(
-                isSelected
-                    ? Icons.check_circle_rounded
-                    : Icons.add_circle_outline_rounded,
-                color: isSelected ? color : Colors.grey.shade600,
-                size: 28,
+            if (!isSelected)
+              IconButton(
+                onPressed: available > 0 ? () => onQuantityChanged(1) : null,
+                tooltip: 'Add one to booking',
+                icon: Icon(Icons.add_circle_outline_rounded,
+                    color: Colors.grey.shade600, size: 28),
+              )
+            else
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: () => onQuantityChanged(quantity - 1),
+                    icon: const Icon(Icons.remove_circle_outline),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  Text('$quantity',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    onPressed: quantity < available
+                        ? () => onQuantityChanged(quantity + 1)
+                        : null,
+                    icon: const Icon(Icons.add_circle_outline),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
               ),
-            ),
           ],
         ),
       ),
@@ -576,4 +825,13 @@ class _InventoryCard extends StatelessWidget {
 String _formatDate(DateTime date) {
   return '${date.day.toString().padLeft(2, '0')}/'
       '${date.month.toString().padLeft(2, '0')}/${date.year}';
+}
+
+DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
+DateTime? _asDate(Object? value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
+  return null;
 }
