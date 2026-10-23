@@ -20,6 +20,22 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Work email'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
+    expect(find.text('Forgot password?'), findsOneWidget);
+    expect(find.text('Create account'), findsNothing);
     expect(find.text('Use test account'), findsNothing);
+  });
+
+  testWidgets('password reset requires a valid email before sending', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: AuthPage()));
+
+    await tester.tap(find.text('Forgot password?'));
+    await tester.pump();
+
+    expect(
+      find.text('Enter a valid email address to reset your password.'),
+      findsOneWidget,
+    );
   });
 }
