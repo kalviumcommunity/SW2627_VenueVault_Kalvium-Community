@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'equipment_catalog_page.dart';
 import 'new_booking_page.dart';
 import 'booking_management_page.dart';
+import 'conflict_detection_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -474,6 +475,19 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const BookingManagementPage(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _ActionTile(
+                icon: Icons.warning_amber_rounded,
+                title: 'Conflict Detection',
+                subtitle: 'Shortages, booking conflicts and unavailable time windows',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ConflictDetectionPage(),
                     ),
                   );
                 },
