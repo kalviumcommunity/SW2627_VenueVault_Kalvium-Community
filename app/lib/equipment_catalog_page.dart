@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 const _categories = <String>[
@@ -86,7 +87,6 @@ class EquipmentItem {
     'rentalPrice': rentalPrice,
     'description': description,
     'maintenanceNotes': maintenanceNotes,
-    'updatedAt': FieldValue.serverTimestamp(),
   };
 }
 
@@ -119,9 +119,17 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
 
     try {
       if (item == null) {
-        await _items.add(result.toFirestore());
+        final requestId = _items.doc().id;
+        await FirebaseFunctions.instance.httpsCallable('saveEquipment').call({
+          'requestId': requestId,
+          'equipment': result.toFirestore(),
+        });
       } else {
-        await _items.doc(item.id).update(result.toFirestore());
+        await FirebaseFunctions.instance.httpsCallable('saveEquipment').call({
+          'requestId': _items.doc().id,
+          'equipmentId': item.id,
+          'equipment': result.toFirestore(),
+        });
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -131,6 +139,8 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
           ),
         ),
       );
+    } on FirebaseFunctionsException catch (error) {
+      _showErrorMessage(error.message ?? 'Could not save equipment.');
     } on FirebaseException catch (error) {
       _showError(error);
     }
@@ -158,14 +168,21 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
     );
     if (confirmed != true) return;
     try {
-      await _items.doc(item.id).update({
-        'status': 'Retired',
-        'availableQuantity': 0,
-        'updatedAt': FieldValue.serverTimestamp(),
+      await FirebaseFunctions.instance.httpsCallable('retireEquipment').call({
+        'equipmentId': item.id,
+        'requestId': _items.doc().id,
       });
+    } on FirebaseFunctionsException catch (error) {
+      _showErrorMessage(error.message ?? 'Could not retire equipment.');
     } on FirebaseException catch (error) {
       _showError(error);
     }
+  }
+
+  void _showErrorMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showError(FirebaseException error) {

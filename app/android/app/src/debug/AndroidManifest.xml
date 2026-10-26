@@ -1,5 +1,0 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- The Firebase Local Emulator Suite uses HTTP. Keep this permission in
-         debug builds only; release builds retain Android's HTTPS-only default. -->
-    <application android:usesCleartextTraffic="true" />
-</manifest>

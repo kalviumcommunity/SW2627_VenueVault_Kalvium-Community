@@ -1,7 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
@@ -10,17 +8,11 @@ import 'new_booking_page.dart';
 import 'booking_management_page.dart';
 import 'conflict_detection_page.dart';
 import 'booking_calendar_page.dart';
+import 'operations_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  if (kDebugMode) {
-    final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-        ? '10.0.2.2'
-        : 'localhost';
-    await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-  }
   runApp(const VenueVaultApp());
 }
 
@@ -511,6 +503,19 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const ConflictDetectionPage(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _ActionTile(
+                icon: Icons.local_shipping_outlined,
+                title: 'Operations',
+                subtitle: 'Manage dispatches, checklists, and returns',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const OperationsPage(),
                     ),
                   );
                 },

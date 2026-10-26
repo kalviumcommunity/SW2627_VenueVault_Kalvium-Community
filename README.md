@@ -39,6 +39,12 @@ The Flutter app and Firebase Functions are intentionally kept in one
 repository. The app is the client; `functions/` contains trusted server-side
 operations and must not be moved into `app/lib/`.
 
+Staff permissions are carried in Firebase Authentication custom claims and
+checked by both callable functions and Firestore rules. Booking, inventory,
+dispatch, and return mutations go through trusted Functions; Firestore client
+writes for those records are denied. A confirmed booking creates its dispatch
+at `dispatches/{bookingId}`, using the booking ID to make retries idempotent.
+
 ## Local setup
 
 ### Prerequisites
