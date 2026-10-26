@@ -111,7 +111,13 @@ class _ConflictEngine {
   }) {
     final activeBookings = bookings.where((doc) {
       final status = (doc.data()['status'] as String? ?? '').toLowerCase();
-      return !const {'cancelled', 'rejected', 'declined'}.contains(status);
+      return !const {
+        'cancelled',
+        'rejected',
+        'declined',
+        'returned',
+        'completed',
+      }.contains(status);
     }).toList();
 
     final shortages = _findShortages(equipment, activeBookings);
@@ -152,9 +158,12 @@ class _ConflictEngine {
         final eqData = equipmentMap[eqId];
         if (eqData == null) continue;
 
-        final usable = (eqData['availableQuantity'] as num?)?.toInt() ??
+        final baseAvailable = (eqData['availableQuantity'] as num?)?.toInt() ??
             (eqData['totalQuantity'] as num?)?.toInt() ??
             0;
+        final unavailable =
+            (eqData['unavailableQuantity'] as num?)?.toInt() ?? 0;
+        final usable = (baseAvailable - unavailable).clamp(0, baseAvailable);
 
         // Count total reserved for this equipment across ALL overlapping bookings.
         var totalReserved = 0;

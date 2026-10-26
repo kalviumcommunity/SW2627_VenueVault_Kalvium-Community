@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'availability_engine.dart';
 
@@ -143,18 +144,17 @@ class _NewBookingPageState extends State<NewBookingPage> {
         'venue': _venueController.text.trim(),
         'staffName': _staffController.text.trim(),
         'notes': _notesController.text.trim(),
-        'startDate': Timestamp.fromDate(_dateOnly(_selectedDates!.start)),
-        'endDate': Timestamp.fromDate(_dateOnly(_selectedDates!.end)),
+        'startDate': _dateOnly(_selectedDates!.start).millisecondsSinceEpoch,
+        'endDate': _dateOnly(_selectedDates!.end).millisecondsSinceEpoch,
         'items': items,
-        'status': widget.initialBooking?['status'] ?? 'confirmed',
-        'updatedAt': FieldValue.serverTimestamp(),
       };
-      if (widget.initialBookingId == null) {
-        data['createdAt'] = FieldValue.serverTimestamp();
-        await db.collection('bookings').add(data);
-      } else {
-        await db.collection('bookings').doc(widget.initialBookingId).update(data);
-      }
+      final requestId = db.collection('bookings').doc().id;
+      await FirebaseFunctions.instance.httpsCallable('saveBooking').call({
+        'requestId': requestId,
+        if (widget.initialBookingId != null)
+          'bookingId': widget.initialBookingId,
+        'booking': data,
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

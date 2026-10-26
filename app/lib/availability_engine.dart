@@ -24,7 +24,13 @@ class AvailabilityEngine {
       if (booking.id == ignoreBookingId) continue;
       final data = booking.data();
       final status = (data['status'] as String? ?? '').toLowerCase();
-      if (const {'cancelled', 'rejected', 'declined'}.contains(status)) {
+      if (const {
+        'cancelled',
+        'rejected',
+        'declined',
+        'returned',
+        'completed',
+      }.contains(status)) {
         continue;
       }
       final start = _readDate(data['startDate'] ?? data['eventStart']);
@@ -62,9 +68,12 @@ class AvailabilityEngine {
     }
     // availableQuantity is the catalog's usable stock; fall back to total for
     // older records that do not have the field.
-    final usable = (data['availableQuantity'] as num?)?.toInt() ??
+    final available = (data['availableQuantity'] as num?)?.toInt() ??
         (data['totalQuantity'] as num?)?.toInt() ??
         0;
+    final unavailable =
+        (data['unavailableQuantity'] as num?)?.toInt() ?? 0;
+    final usable = (available - unavailable).clamp(0, available);
     return (usable - reserved).clamp(0, usable);
   }
 

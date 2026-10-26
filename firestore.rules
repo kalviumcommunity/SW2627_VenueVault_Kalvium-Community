@@ -1,18 +1,110 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Assumed data model:
+    // users/{uid}: private profile and role metadata; reads are owner-only.
+    // bookings/{id}: booking form fields, timestamp dates, equipment item list,
+    //   status, and creator/timestamps. Created and changed by trusted functions.
+    // equipment/{id}: name/category, integer quantities, condition/status,
+    //   location, price, notes, and updatedAt timestamp.
+    // dispatches/{bookingId}: one server-created dispatch per confirmed booking.
+    // returns/{bookingId}: one pending/approved inspection record per booking.
+    // auditLogs/{id}: server-created action, actorUid, resourceId, details, time.
+    // availabilityLocks/{equipmentId}: server-only transaction serialization.
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasPermission(permission) {
+      let role = isAuthenticated() ? request.auth.token.role : '';
+      return role == 'admin' ||
+        (permission == 'users.manage' && role == 'admin') ||
+        (permission == 'settings.manage' && role == 'admin') ||
+        (permission == 'equipment.manage' && role == 'admin') ||
+        (permission == 'inventory.view' &&
+          role in ['booking_staff', 'warehouse_staff', 'operations_manager']) ||
+        (permission == 'bookings.view' &&
+          role in ['booking_staff', 'warehouse_staff', 'operations_manager']) ||
+        (permission in ['bookings.create', 'bookings.edit', 'bookings.cancel'] &&
+          role == 'booking_staff') ||
+        (permission == 'conflicts.resolve' && role == 'operations_manager') ||
+        (permission == 'approvals.decide' && role == 'operations_manager') ||
+        (permission == 'dispatch.viewAll' &&
+          role in ['warehouse_staff', 'operations_manager']) ||
+        (permission == 'dispatch.viewAssigned' && role == 'dispatch_staff') ||
+        (permission == 'dispatch.assign' && role == 'operations_manager') ||
+        (permission == 'dispatch.updateStatus' && role == 'dispatch_staff') ||
+        (permission == 'checklist.manage' && role == 'warehouse_staff') ||
+        (permission == 'stock.update' && role == 'warehouse_staff') ||
+        (permission == 'returns.record' && role == 'warehouse_staff') ||
+        (permission == 'returns.approve' && role == 'operations_manager') ||
+        (permission == 'maintenance.manage' && role == 'warehouse_staff') ||
+        (permission == 'issues.report' && role in ['warehouse_staff', 'dispatch_staff']) ||
+        (permission == 'dashboard.view' && role == 'operations_manager') ||
+        (permission == 'reports.viewFull' && role == 'operations_manager') ||
+        (permission == 'reports.viewLimited' && role == 'booking_staff') ||
+        (permission == 'audit.view' && role == 'operations_manager');
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list, create, update, delete: if false;
+    }
+
+    match /equipment/{equipmentId} {
+      allow read: if hasPermission('inventory.view');
+      allow create, update, delete: if false;
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if hasPermission('bookings.view');
+      allow create, update, delete: if false;
+    }
+
+    match /dispatches/{dispatchId} {
+      allow get, list: if hasPermission('dispatch.viewAll') ||
+        (hasPermission('dispatch.viewAssigned') &&
+          resource.data.assignedStaffUid == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /returns/{returnId} {
+      allow read: if hasPermission('returns.record') ||
+        hasPermission('returns.approve');
+      allow create, update, delete: if false;
+    }
+
+    match /auditLogs/{auditId} {
+      allow read: if hasPermission('audit.view');
+      allow create, update, delete: if false;
+    }
+
+    match /availabilityLocks/{equipmentId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 11, 5);
+      allow read, write: if false;
     }
   }
 }

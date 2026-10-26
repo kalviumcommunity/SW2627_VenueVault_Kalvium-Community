@@ -27,6 +27,13 @@ export const setUserRole = onCall(async (request) => {
     updatedBy: request.auth?.uid,
     updatedAt: FieldValue.serverTimestamp(),
   }, {merge: true});
+  await db().collection("auditLogs").add({
+    action: "user.role_changed",
+    actorUid: request.auth?.uid,
+    resourceId: targetUid,
+    details: {role: newRole},
+    createdAt: FieldValue.serverTimestamp(),
+  });
   // Force the user to sign in again so the new role takes effect.
   await auth().revokeRefreshTokens(targetUid);
 
