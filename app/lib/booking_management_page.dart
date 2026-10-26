@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import 'new_booking_page.dart';
@@ -31,10 +32,10 @@ class BookingManagementPage extends StatelessWidget {
     );
     if (confirmed != true) return;
     try {
-      await _bookings.doc(id).update({
-        'status': 'cancelled',
-        'cancelledAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
+      final requestId = _bookings.doc().id;
+      await FirebaseFunctions.instance.httpsCallable('cancelBooking').call({
+        'bookingId': id,
+        'requestId': requestId,
       });
     } catch (error) {
       if (context.mounted) {
@@ -50,9 +51,9 @@ class BookingManagementPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Bookings')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const NewBookingPage()),
-        ),
+        onPressed: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const NewBookingPage())),
         icon: const Icon(Icons.add),
         label: const Text('New booking'),
       ),
@@ -69,9 +70,7 @@ class BookingManagementPage extends StatelessWidget {
           docs.sort((a, b) {
             final aDate = _date(a.data()['startDate']);
             final bDate = _date(b.data()['startDate']);
-            return (aDate ?? DateTime(1900)).compareTo(
-              bDate ?? DateTime(1900),
-            );
+            return (aDate ?? DateTime(1900)).compareTo(bDate ?? DateTime(1900));
           });
           if (docs.isEmpty) {
             return const Center(
@@ -117,7 +116,9 @@ class BookingManagementPage extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(data['customerName'] as String? ?? 'Customer not set'),
+                        Text(
+                          data['customerName'] as String? ?? 'Customer not set',
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           '${_formatDate(start)} – ${_formatDate(end)}  ·  '
@@ -145,7 +146,10 @@ class BookingManagementPage extends StatelessWidget {
                               ),
                               TextButton.icon(
                                 onPressed: () => _cancel(context, document.id),
-                                icon: const Icon(Icons.cancel_outlined, size: 18),
+                                icon: const Icon(
+                                  Icons.cancel_outlined,
+                                  size: 18,
+                                ),
                                 label: const Text('Cancel booking'),
                               ),
                             ],
@@ -178,11 +182,16 @@ class BookingManagementPage extends StatelessWidget {
               _detail('Customer', data['customerName']),
               _detail('Phone', data['customerPhone']),
               _detail('Venue', data['venue']),
-              _detail('Dates',
-                  '${_formatDate(_date(data['startDate']))} – ${_formatDate(_date(data['endDate']))}'),
+              _detail(
+                'Dates',
+                '${_formatDate(_date(data['startDate']))} – ${_formatDate(_date(data['endDate']))}',
+              ),
               _detail('Staff', data['staffName']),
               const SizedBox(height: 10),
-              const Text('Equipment', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Equipment',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               ...items.map((item) {
                 if (item is! Map) return const SizedBox.shrink();
                 return Text(

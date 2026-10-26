@@ -26,6 +26,16 @@ import {setGlobalOptions} from "firebase-functions";
 // this will be the maximum concurrent request count.
 setGlobalOptions({maxInstances: 10});
 export {setUserRole} from "./setUserRole";
+export {cancelBooking, saveBooking} from "./bookings";
+export {retireEquipment, saveEquipment} from "./equipment";
+export {
+  approveReturn,
+  createDispatchForBooking,
+  recordReturn,
+  resolveUnavailableEquipment,
+  syncDispatchForBooking,
+  updateDispatch,
+} from "./operations";
 // export const helloWorld = onRequest((request, response) => {
 //   logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
