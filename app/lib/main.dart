@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'firebase_options.dart';
@@ -11,6 +13,13 @@ import 'conflict_detection_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (kDebugMode) {
+    final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+        ? '10.0.2.2'
+        : 'localhost';
+    await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+  }
   runApp(const VenueVaultApp());
 }
 
@@ -85,21 +94,16 @@ class AuthPage extends StatefulWidget {
 
 class _AuthPageState extends State<AuthPage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  bool _isSignUp = false;
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -111,43 +115,86 @@ class _AuthPageState extends State<AuthPage> {
     });
 
     try {
-      if (_isSignUp) {
-        final credential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(
-              email: _emailController.text.trim(),
-              password: _passwordController.text,
-            );
-        await credential.user?.updateDisplayName(_nameController.text.trim());
-      } else {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        setState(() => _errorMessage = _authErrorMessage(error.code));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _emailController.text.trim();
+    if (_validateEmail(email) != null) {
+      setState(
+        () => _errorMessage =
+            'Enter a valid email address to reset your password.',
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        _showResetConfirmation();
       }
     } on FirebaseAuthException catch (error) {
-      setState(() => _errorMessage = _authErrorMessage(error.code));
+      if (!mounted) return;
+      if (error.code == 'user-not-found') {
+        _showResetConfirmation();
+      } else {
+        setState(() => _errorMessage = _authErrorMessage(error.code));
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  void _showResetConfirmation() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'If an account exists for this email, password reset instructions have been sent.',
+        ),
+      ),
+    );
   }
 
   String _authErrorMessage(String code) {
     switch (code) {
-      case 'email-already-in-use':
-        return 'An account with this email already exists.';
       case 'invalid-credential':
       case 'wrong-password':
       case 'user-not-found':
         return 'The email or password is incorrect.';
-      case 'weak-password':
-        return 'Use a password with at least 6 characters.';
       case 'invalid-email':
         return 'Enter a valid email address.';
       case 'operation-not-allowed':
         return 'Email/password sign-in is not enabled in Firebase yet.';
+      case 'too-many-requests':
+        return 'Too many attempts. Wait a little and try again.';
       default:
         return 'Authentication failed. Please try again.';
     }
+  }
+
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)
+        ? null
+        : 'Enter a valid email address';
   }
 
   @override
@@ -225,32 +272,16 @@ class _AuthPageState extends State<AuthPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                _isSignUp ? 'Create your account' : 'Welcome back',
+                'Welcome back',
                 style: Theme.of(context).textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               Text(
-                _isSignUp
-                    ? 'Set up your VenueVault workspace access.'
-                    : 'Sign in to continue to VenueVault.',
+                'Sign in to continue to VenueVault.',
                 style: const TextStyle(color: Color(0xff6b7280)),
               ),
               const SizedBox(height: 28),
-              if (_isSignUp) ...[
-                TextFormField(
-                  controller: _nameController,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Full name',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter your name'
-                      : null,
-                ),
-                const SizedBox(height: 14),
-              ],
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -259,21 +290,13 @@ class _AuthPageState extends State<AuthPage> {
                   labelText: 'Work email',
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Enter your email';
-                  }
-                  if (!value.contains('@')) return 'Enter a valid email';
-                  return null;
-                },
+                validator: _validateEmail,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
-                textInputAction: _isSignUp
-                    ? TextInputAction.next
-                    : TextInputAction.done,
+                textInputAction: TextInputAction.done,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   prefixIcon: const Icon(Icons.lock_outline),
@@ -291,20 +314,13 @@ class _AuthPageState extends State<AuthPage> {
                     ? 'Use at least 6 characters'
                     : null,
               ),
-              if (_isSignUp) ...[
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: _obscurePassword,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm password',
-                    prefixIcon: Icon(Icons.lock_reset_outlined),
-                  ),
-                  validator: (value) => value != _passwordController.text
-                      ? 'Passwords do not match'
-                      : null,
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _isLoading ? null : _sendPasswordReset,
+                  child: const Text('Forgot password?'),
                 ),
-              ],
+              ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 16),
                 Text(
@@ -327,26 +343,7 @@ class _AuthPageState extends State<AuthPage> {
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(_isSignUp ? 'Create account' : 'Sign in'),
-              ),
-              const SizedBox(height: 18),
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    _isSignUp
-                        ? 'Already have an account?'
-                        : 'New to VenueVault?',
-                  ),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      _isSignUp = !_isSignUp;
-                      _errorMessage = null;
-                    }),
-                    child: Text(_isSignUp ? 'Sign in' : 'Create account'),
-                  ),
-                ],
+                    : const Text('Sign in'),
               ),
             ],
           ),
@@ -361,6 +358,17 @@ class HomePage extends StatelessWidget {
 
   final User? user;
 
+  Future<void> _signOut(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+    } on FirebaseAuthException {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not sign out. Please try again.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -369,7 +377,7 @@ class HomePage extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Sign out',
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: () => _signOut(context),
             icon: const Icon(Icons.logout),
           ),
         ],
@@ -483,7 +491,8 @@ class HomePage extends StatelessWidget {
               _ActionTile(
                 icon: Icons.warning_amber_rounded,
                 title: 'Conflict Detection',
-                subtitle: 'Shortages, booking conflicts and unavailable time windows',
+                subtitle:
+                    'Shortages, booking conflicts and unavailable time windows',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
