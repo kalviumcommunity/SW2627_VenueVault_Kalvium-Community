@@ -37,6 +37,15 @@ class BookingManagementPage extends StatelessWidget {
         'bookingId': id,
         'requestId': requestId,
       });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Booking cancelled. Its equipment is available for those dates again.',
+            ),
+          ),
+        );
+      }
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

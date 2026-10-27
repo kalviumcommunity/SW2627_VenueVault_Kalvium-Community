@@ -130,9 +130,6 @@ export const saveBooking = onCall(async (request) => {
   }
   const input = parseBooking(request.data.booking);
   const bookingRef = db().collection("bookings").doc(bookingId);
-  const lockRefs = input.items.map((item) =>
-    db().collection("availabilityLocks").doc(bookingLockId(item.equipmentId)),
-  );
   const equipmentRefs = input.items.map((item) =>
     db().collection("equipment").doc(item.equipmentId),
   );
@@ -150,11 +147,29 @@ export const saveBooking = onCall(async (request) => {
       throw new HttpsError("not-found", "Booking not found.");
     }
 
+    const existing = bookingSnapshot.data();
+    const previousItems = existing?.items;
+    const previousEquipmentIds = Array.isArray(previousItems) ?
+      previousItems.flatMap((raw: unknown) => {
+        if (typeof raw !== "object" || raw === null) return [];
+        const equipmentId = (raw as Record<string, unknown>).equipmentId;
+        return typeof equipmentId === "string" ? [equipmentId] : [];
+      }) :
+      [];
+    const affectedEquipmentIds = new Set([
+      ...previousEquipmentIds,
+      ...input.items.map((item) => item.equipmentId),
+    ]);
+    // Lock both the previous and new equipment set on edits. Otherwise a
+    // concurrent booking could validate against stock while this edit is
+    // releasing a reservation for a removed item.
+    const lockRefs = [...affectedEquipmentIds].map((equipmentId) =>
+      db().collection("availabilityLocks").doc(bookingLockId(equipmentId)),
+    );
     const [equipmentSnapshots, lockSnapshots] = await Promise.all([
       transaction.getAll(...equipmentRefs),
       transaction.getAll(...lockRefs),
     ]);
-    const existing = bookingSnapshot.data();
     const overlaps = allBookings.docs.filter((document) => {
       if (document.id === bookingId) return false;
       const data = document.data();
