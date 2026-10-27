@@ -24,15 +24,9 @@ class AvailabilityEngine {
       if (booking.id == ignoreBookingId) continue;
       final data = booking.data();
       final status = (data['status'] as String? ?? '').toLowerCase();
-      if (const {
-        'cancelled',
-        'rejected',
-        'declined',
-        'returned',
-        'completed',
-      }.contains(status)) {
-        continue;
-      }
+      // Keep client-side availability aligned with the server transaction:
+      // only confirmed bookings reserve stock.
+      if (status != 'confirmed') continue;
       final start = _readDate(data['startDate'] ?? data['eventStart']);
       final end = _readDate(data['endDate'] ?? data['eventEnd']);
       if (start == null || end == null || end.isBefore(start)) continue;
