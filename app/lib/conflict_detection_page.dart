@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import 'role_permissions.dart';
 
 // ---------------------------------------------------------------------------
 // Data models
@@ -444,6 +447,40 @@ class ConflictDetectionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('Sign in to view conflicts.')),
+      );
+    }
+    return FutureBuilder<IdTokenResult>(
+      future: user.getIdTokenResult(true),
+      builder: (context, tokenSnapshot) {
+        if (tokenSnapshot.hasError) {
+          return const Scaffold(
+            body: Center(child: Text('Could not load conflict permissions.')),
+          );
+        }
+        if (!tokenSnapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final role = tokenSnapshot.data!.claims?['role'] as String?;
+        if (!hasRolePermission(role, 'inventory.view') ||
+            !hasRolePermission(role, 'bookings.view')) {
+          return const Scaffold(
+            body: Center(
+              child: Text('You do not have access to conflict reports.'),
+            ),
+          );
+        }
+        return _buildConflictReport(context);
+      },
+    );
+  }
+
+  Widget _buildConflictReport(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(

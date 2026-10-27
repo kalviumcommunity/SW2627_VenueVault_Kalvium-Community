@@ -3,13 +3,15 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import 'role_permissions.dart';
+
 class OperationsPage extends StatelessWidget {
   const OperationsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<IdTokenResult>(
-      future: FirebaseAuth.instance.currentUser!.getIdTokenResult(),
+      future: FirebaseAuth.instance.currentUser!.getIdTokenResult(true),
       builder: (context, tokenSnapshot) {
         if (tokenSnapshot.hasError) {
           return const Scaffold(
@@ -21,8 +23,16 @@ class OperationsPage extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        final role = tokenSnapshot.data!.claims?['role'] as String? ?? '';
-        return _OperationsTabs(role: role);
+        final role = tokenSnapshot.data!.claims?['role'] as String?;
+        if (!hasRolePermission(role, 'dispatch.viewAll') &&
+            !hasRolePermission(role, 'dispatch.viewAssigned') &&
+            !hasRolePermission(role, 'returns.record') &&
+            !hasRolePermission(role, 'returns.approve')) {
+          return const Scaffold(
+            body: Center(child: Text('You do not have access to Operations.')),
+          );
+        }
+        return _OperationsTabs(role: role ?? '');
       },
     );
   }
@@ -35,14 +45,16 @@ class _OperationsTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canViewReturns = {
-      'admin',
-      'warehouse_staff',
-      'operations_manager',
-    }.contains(role);
-    final canViewAudit = {'admin', 'operations_manager'}.contains(role);
+    final canViewDispatch =
+        hasRolePermission(role, 'dispatch.viewAll') ||
+        hasRolePermission(role, 'dispatch.viewAssigned');
+    final canViewReturns =
+        hasRolePermission(role, 'returns.record') ||
+        hasRolePermission(role, 'returns.approve');
+    final canViewAudit = hasRolePermission(role, 'audit.view');
     final tabs = <Widget>[
-      const Tab(text: 'Dispatch', icon: Icon(Icons.local_shipping_outlined)),
+      if (canViewDispatch)
+        const Tab(text: 'Dispatch', icon: Icon(Icons.local_shipping_outlined)),
       if (canViewReturns)
         const Tab(
           text: 'Returns',
@@ -51,7 +63,7 @@ class _OperationsTabs extends StatelessWidget {
       if (canViewAudit) const Tab(text: 'Audit', icon: Icon(Icons.history)),
     ];
     final pages = <Widget>[
-      const _DispatchList(),
+      if (canViewDispatch) const _DispatchList(),
       if (canViewReturns) _ReturnsList(role: role),
       if (canViewAudit) const _AuditList(),
     ];
@@ -75,14 +87,23 @@ class _DispatchList extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return FutureBuilder<IdTokenResult>(
-      future: FirebaseAuth.instance.currentUser!.getIdTokenResult(),
+      future: FirebaseAuth.instance.currentUser!.getIdTokenResult(true),
       builder: (context, tokenSnapshot) {
+        if (tokenSnapshot.hasError) {
+          return const Center(child: Text('Could not load dispatch permissions.'));
+        }
         if (!tokenSnapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final role = tokenSnapshot.data!.claims?['role'] as String? ?? '';
+        final canManageChecklist =
+            hasRolePermission(role, 'checklist.manage');
+        final canAssign = hasRolePermission(role, 'dispatch.assign');
+        final canUpdateStatus =
+            hasRolePermission(role, 'dispatch.updateStatus');
         final query = FirebaseFirestore.instance.collection('dispatches');
-        final stream = role == 'dispatch_staff'
+        final stream = hasRolePermission(role, 'dispatch.viewAssigned') &&
+                !hasRolePermission(role, 'dispatch.viewAll')
             ? query.where('assignedStaffUid', isEqualTo: uid).snapshots()
             : query.snapshots();
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -139,7 +160,7 @@ class _DispatchList extends StatelessWidget {
                             dense: true,
                             value: packed,
                             secondary:
-                                role == 'admin' || role == 'warehouse_staff'
+                                canManageChecklist
                                 ? IconButton(
                                     tooltip: item['missing'] == true
                                         ? 'Clear missing status'
@@ -165,7 +186,7 @@ class _DispatchList extends StatelessWidget {
                                   )
                                 : null,
                             onChanged:
-                                role == 'admin' || role == 'warehouse_staff'
+                                canManageChecklist
                                 ? (value) =>
                                       _dispatchUpdate(context, document.id, {
                                         'checklistIndex': entry.$1,
@@ -174,7 +195,7 @@ class _DispatchList extends StatelessWidget {
                                 : null,
                           );
                         }),
-                        if (role == 'admin' || role == 'operations_manager')
+                        if (canAssign)
                           _AssignmentControls(
                             dispatchId: document.id,
                             data: data,
@@ -182,7 +203,7 @@ class _DispatchList extends StatelessWidget {
                         Wrap(
                           spacing: 8,
                           children: [
-                            if (role == 'admin' || role == 'operations_manager')
+                            if (canAssign)
                               OutlinedButton.icon(
                                 onPressed: () =>
                                     _updateTransport(context, document.id),
@@ -190,7 +211,13 @@ class _DispatchList extends StatelessWidget {
                                 label: const Text('Transport'),
                               ),
                             if (data['status'] != 'completed' &&
-                                _canAdvance(role, uid, data))
+                                _canAdvance(
+                                  uid,
+                                  data,
+                                  canManageChecklist: canManageChecklist,
+                                  canUpdateStatus: canUpdateStatus,
+                                  canAssign: canAssign,
+                                ))
                               FilledButton(
                                 onPressed: () => _advanceStatus(
                                   context,
@@ -300,8 +327,10 @@ class _ReturnsList extends StatelessWidget {
                               trailing:
                                   data['status'] == 'approved' &&
                                       issueQuantity > resolved &&
-                                      (role == 'admin' ||
-                                          role == 'warehouse_staff')
+                                      hasRolePermission(
+                                        role,
+                                        'maintenance.manage',
+                                      )
                                   ? TextButton(
                                       onPressed: () => _resolveIssue(
                                         context,
@@ -315,7 +344,7 @@ class _ReturnsList extends StatelessWidget {
                             );
                           }),
                           if (data['status'] == 'pending_inspection' &&
-                              (role == 'admin' || role == 'operations_manager'))
+                              hasRolePermission(role, 'returns.approve'))
                             FilledButton(
                               onPressed: () =>
                                   _approveReturn(context, document.id),
@@ -330,18 +359,24 @@ class _ReturnsList extends StatelessWidget {
             },
           ),
         ),
-        if (role == 'admin' || role == 'warehouse_staff') _EndedBookings(),
+        if (hasRolePermission(role, 'returns.record')) _EndedBookings(),
       ],
     );
   }
 }
 
-bool _canAdvance(String role, String uid, Map<String, dynamic> dispatch) {
-  if (role == 'admin' || role == 'operations_manager') return true;
-  if (role == 'warehouse_staff') {
+bool _canAdvance(
+  String uid,
+  Map<String, dynamic> dispatch, {
+  required bool canManageChecklist,
+  required bool canUpdateStatus,
+  required bool canAssign,
+}) {
+  if (canAssign) return true;
+  if (canManageChecklist) {
     return dispatch['status'] == 'pending' || dispatch['status'] == 'preparing';
   }
-  return role == 'dispatch_staff' && dispatch['assignedStaffUid'] == uid;
+  return canUpdateStatus && dispatch['assignedStaffUid'] == uid;
 }
 
 class _EndedBookings extends StatelessWidget {
