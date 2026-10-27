@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 const _categories = <String>[
@@ -29,6 +30,8 @@ const _statuses = <String>[
 ];
 
 const _conditions = <String>['Excellent', 'Good', 'Fair', 'Poor'];
+
+enum _EquipmentAccess { viewOnly, stockUpdate, catalogManage }
 
 class EquipmentItem {
   const EquipmentItem({
@@ -103,6 +106,29 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
   String _categoryFilter = 'All categories';
   String _statusFilter = 'All statuses';
   String _searchText = '';
+  late final Future<_EquipmentAccess> _accessFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _accessFuture = _loadEquipmentAccess();
+  }
+
+  Future<_EquipmentAccess> _loadEquipmentAccess() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return _EquipmentAccess.viewOnly;
+    try {
+      final token = await user.getIdTokenResult(true);
+      return switch (token.claims?['role']) {
+        'admin' => _EquipmentAccess.catalogManage,
+        'warehouse_staff' => _EquipmentAccess.stockUpdate,
+        _ => _EquipmentAccess.viewOnly,
+      };
+    } catch (_) {
+      // Hide management actions if the account role cannot be verified.
+      return _EquipmentAccess.viewOnly;
+    }
+  }
 
   @override
   void dispose() {
@@ -110,10 +136,13 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
     super.dispose();
   }
 
-  Future<void> _openEditor([EquipmentItem? item]) async {
+  Future<void> _openEditor({
+    EquipmentItem? item,
+    bool stockOnly = false,
+  }) async {
     final result = await showDialog<EquipmentItem>(
       context: context,
-      builder: (_) => _EquipmentEditor(item: item),
+      builder: (_) => _EquipmentEditor(item: item, stockOnly: stockOnly),
     );
     if (result == null) return;
 
@@ -140,7 +169,10 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
         ),
       );
     } on FirebaseFunctionsException catch (error) {
-      _showErrorMessage(error.message ?? 'Could not save equipment.');
+      final message = error.code == 'permission-denied'
+          ? 'You do not have permission to edit this equipment or change its rental price. Ask an admin for access.'
+          : error.message ?? 'Could not save equipment.';
+      _showErrorMessage(message);
     } on FirebaseException catch (error) {
       _showError(error);
     }
@@ -198,13 +230,20 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return FutureBuilder<_EquipmentAccess>(
+      future: _accessFuture,
+      builder: (context, accessSnapshot) {
+        final access = accessSnapshot.data ?? _EquipmentAccess.viewOnly;
+        final canManageCatalog = access == _EquipmentAccess.catalogManage;
+        final canUpdateStock = access == _EquipmentAccess.stockUpdate;
+        return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Equipment catalog',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         actions: [
+          if (canManageCatalog)
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: FilledButton.icon(
@@ -257,9 +296,11 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
                             ? 'Your catalog is empty'
                             : 'No matching equipment',
                         subtitle: allItems.isEmpty
-                            ? 'Add equipment to start tracking inventory and rental details.'
+                            ? canManageCatalog
+                                  ? 'Add equipment to start tracking inventory and rental details.'
+                                  : 'Ask an admin to add items to the catalog.'
                             : 'Try changing the search or filters.',
-                        action: allItems.isEmpty
+                        action: allItems.isEmpty && canManageCatalog
                             ? FilledButton.icon(
                                 onPressed: () => _openEditor(),
                                 icon: const Icon(Icons.add),
@@ -276,8 +317,18 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
                           itemBuilder: (context, index) => _EquipmentTile(
                             item: items[index],
                             compact: constraints.maxWidth < 650,
-                            onEdit: () => _openEditor(items[index]),
-                            onRetire: () => _retire(items[index]),
+                            onEdit: canManageCatalog
+                                ? () => _openEditor(item: items[index])
+                                : null,
+                            onUpdateStock: canUpdateStock
+                                ? () => _openEditor(
+                                    item: items[index],
+                                    stockOnly: true,
+                                  )
+                                : null,
+                            onRetire: canManageCatalog
+                                ? () => _retire(items[index])
+                                : null,
                           ),
                         ),
                       ),
@@ -286,6 +337,8 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
           );
         },
       ),
+    );
+      },
     );
   }
 
@@ -507,13 +560,15 @@ class _EquipmentTile extends StatelessWidget {
   const _EquipmentTile({
     required this.item,
     required this.compact,
-    required this.onEdit,
-    required this.onRetire,
+    this.onEdit,
+    this.onUpdateStock,
+    this.onRetire,
   });
   final EquipmentItem item;
   final bool compact;
-  final VoidCallback onEdit;
-  final VoidCallback onRetire;
+  final VoidCallback? onEdit;
+  final VoidCallback? onUpdateStock;
+  final VoidCallback? onRetire;
 
   Color get _statusColor => switch (item.status) {
     'Available' => const Color(0xff047857),
@@ -610,10 +665,16 @@ class _EquipmentTile extends StatelessWidget {
                 ],
               ),
             ),
+            if (onEdit != null || onUpdateStock != null || onRetire != null)
             PopupMenuButton<String>(
               tooltip: 'Equipment actions',
-              onSelected: (value) => value == 'edit' ? onEdit() : onRetire(),
+              onSelected: (value) {
+                if (value == 'edit') onEdit?.call();
+                if (value == 'stock') onUpdateStock?.call();
+                if (value == 'retire') onRetire?.call();
+              },
               itemBuilder: (_) => [
+                if (onEdit != null)
                 const PopupMenuItem(
                   value: 'edit',
                   child: ListTile(
@@ -622,7 +683,16 @@ class _EquipmentTile extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                if (item.status != 'Retired')
+                if (onUpdateStock != null)
+                  const PopupMenuItem(
+                    value: 'stock',
+                    child: ListTile(
+                      leading: Icon(Icons.inventory_outlined),
+                      title: Text('Update stock'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                if (onRetire != null && item.status != 'Retired')
                   const PopupMenuItem(
                     value: 'retire',
                     child: ListTile(
@@ -738,8 +808,9 @@ class _CatalogMessage extends StatelessWidget {
 }
 
 class _EquipmentEditor extends StatefulWidget {
-  const _EquipmentEditor({this.item});
+  const _EquipmentEditor({this.item, this.stockOnly = false});
   final EquipmentItem? item;
+  final bool stockOnly;
   @override
   State<_EquipmentEditor> createState() => _EquipmentEditorState();
 }
@@ -836,7 +907,13 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.item == null ? 'Add equipment' : 'Edit equipment'),
+      title: Text(
+        widget.stockOnly
+            ? 'Update stock'
+            : widget.item == null
+            ? 'Add equipment'
+            : 'Edit equipment',
+      ),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -852,6 +929,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                   ),
                   validator: _required,
                   textCapitalization: TextCapitalization.sentences,
+                  readOnly: widget.stockOnly,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -865,8 +943,9 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                             DropdownMenuItem(value: value, child: Text(value)),
                       )
                       .toList(),
-                  onChanged: (value) =>
-                      setState(() => _category = value ?? 'Other'),
+                  onChanged: widget.stockOnly
+                      ? null
+                      : (value) => setState(() => _category = value ?? 'Other'),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -880,6 +959,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                         keyboardType: TextInputType.number,
                         validator: _quantity,
                         onChanged: (_) => setState(() {}),
+                        readOnly: widget.stockOnly,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -951,6 +1031,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                     prefixIcon: Icon(Icons.location_on_outlined),
                   ),
                   validator: _required,
+                  readOnly: widget.stockOnly,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -962,6 +1043,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
+                  readOnly: widget.stockOnly,
                   validator: (value) {
                     final price = double.tryParse(value ?? '');
                     return price == null || price < 0
@@ -975,6 +1057,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                   decoration: const InputDecoration(labelText: 'Description'),
                   maxLines: 2,
                   textCapitalization: TextCapitalization.sentences,
+                  readOnly: widget.stockOnly,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -997,7 +1080,13 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
         ),
         FilledButton(
           onPressed: _save,
-          child: Text(widget.item == null ? 'Add item' : 'Save changes'),
+          child: Text(
+            widget.stockOnly
+                ? 'Save stock'
+                : widget.item == null
+                ? 'Add item'
+                : 'Save changes',
+          ),
         ),
       ],
     );

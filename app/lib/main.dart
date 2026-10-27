@@ -108,10 +108,13 @@ class _AuthPageState extends State<AuthPage> {
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      final token = await credential.user!.getIdTokenResult(true);
+      final role = token.claims?['role'] ?? 'role not set';
+      debugPrint('Role claim: $role');
     } on FirebaseAuthException catch (error) {
       if (mounted) {
         setState(() => _errorMessage = _authErrorMessage(error.code));
