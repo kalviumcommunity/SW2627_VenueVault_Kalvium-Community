@@ -31,6 +31,7 @@ export {retireEquipment, saveEquipment} from "./equipment";
 export {
   approveReturn,
   createDispatchForBooking,
+  getOperationsDashboard,
   recordReturn,
   resolveUnavailableEquipment,
   syncDispatchForBooking,

@@ -1,10 +1,18 @@
-import {FieldValue, Transaction} from "firebase-admin/firestore";
+import {FieldValue, Timestamp, Transaction} from "firebase-admin/firestore";
 import {HttpsError, onCall} from "firebase-functions/https";
 import {
   onDocumentCreated,
   onDocumentUpdated,
 } from "firebase-functions/v2/firestore";
 import {auth, db} from "./admin";
+import {
+  DashboardBooking,
+  DashboardDispatch,
+  DashboardEquipment,
+  DashboardItem,
+  DashboardReturn,
+  summarizeOperations,
+} from "./operationsDashboard";
 import {hasPermission} from "./roles";
 
 const dispatchStatuses = [
@@ -692,4 +700,175 @@ export const resolveUnavailableEquipment = onCall(async (request) => {
     );
   });
   return {equipmentId, resolved: quantity};
+});
+
+const dashboardReadLimit = 5000;
+
+const timestampMillis = (value: unknown): number | null => {
+  if (value instanceof Timestamp) return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return typeof value === "number" && Number.isFinite(value) ?
+    value :
+    null;
+};
+
+const dashboardBooking = (
+  id: string,
+  data: FirebaseFirestore.DocumentData,
+): DashboardBooking => ({
+  id,
+  status: typeof data.status === "string" ? data.status : "",
+  eventName: typeof data.eventName === "string" ? data.eventName : "Event",
+  venue: typeof data.venue === "string" ? data.venue : "",
+  startDateMillis: timestampMillis(data.startDate),
+  endDateMillis: timestampMillis(data.endDate),
+  items: Array.isArray(data.items) ?
+    data.items.flatMap((raw: unknown): DashboardItem[] => {
+      if (typeof raw !== "object" || raw === null) return [];
+      const item = raw as Record<string, unknown>;
+      return typeof item.equipmentId === "string" &&
+        typeof item.quantity === "number" &&
+        Number.isInteger(item.quantity) &&
+        item.quantity > 0 ?
+        [{equipmentId: item.equipmentId, quantity: item.quantity}] :
+        [];
+    }) :
+    [],
+});
+
+export const getOperationsDashboard = onCall(async (request) => {
+  requireCaller(request, "dashboard.view");
+  const timeZoneOffsetMinutes =
+    request.data?.timeZoneOffsetMinutes === undefined ?
+      0 :
+      request.data.timeZoneOffsetMinutes;
+  if (
+    typeof timeZoneOffsetMinutes !== "number" ||
+    !Number.isInteger(timeZoneOffsetMinutes) ||
+    Math.abs(timeZoneOffsetMinutes) > 14 * 60
+  ) {
+    throw new HttpsError("invalid-argument", "Invalid dashboard time zone.");
+  }
+  const [
+    bookingsSnapshot,
+    equipmentSnapshot,
+    dispatchesSnapshot,
+    pendingReturnsSnapshot,
+  ] = await Promise.all([
+    db().collection("bookings")
+      .where("status", "==", "confirmed")
+      .limit(dashboardReadLimit + 1)
+      .get(),
+    db().collection("equipment")
+      .limit(dashboardReadLimit + 1)
+      .get(),
+    db().collection("dispatches")
+      .where("status", "in", [
+        "pending",
+        "preparing",
+        "ready",
+        "dispatched",
+        "delivered",
+      ])
+      .limit(dashboardReadLimit + 1)
+      .get(),
+    db().collection("returns")
+      .where("status", "==", "pending_inspection")
+      .limit(dashboardReadLimit + 1)
+      .get(),
+  ]);
+
+  if (
+    bookingsSnapshot.size > dashboardReadLimit ||
+    equipmentSnapshot.size > dashboardReadLimit ||
+    dispatchesSnapshot.size > dashboardReadLimit ||
+    pendingReturnsSnapshot.size > dashboardReadLimit
+  ) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "The dashboard data exceeds the supported summary size.",
+    );
+  }
+
+  const bookings = bookingsSnapshot.docs.map((document) =>
+    dashboardBooking(document.id, document.data()),
+  );
+  const equipment: DashboardEquipment[] = equipmentSnapshot.docs.map(
+    (document) => {
+      const data = document.data();
+      return {
+        id: document.id,
+        status: typeof data.status === "string" ? data.status : "",
+        totalQuantity:
+          typeof data.totalQuantity === "number" ? data.totalQuantity : 0,
+        availableQuantity:
+          typeof data.availableQuantity === "number" ?
+            data.availableQuantity :
+            0,
+        unavailableQuantity:
+          typeof data.unavailableQuantity === "number" ?
+            data.unavailableQuantity :
+            0,
+      };
+    },
+  );
+  const dispatches: DashboardDispatch[] = dispatchesSnapshot.docs.map(
+    (document) => ({
+      bookingId: document.id,
+      status: typeof document.data().status === "string" ?
+        document.data().status :
+        "",
+    }),
+  );
+  const nowMillis = Date.now();
+  const offsetMillis = timeZoneOffsetMinutes * 60 * 1000;
+  const startOfToday = new Date(nowMillis + offsetMillis);
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  const todayMillis = startOfToday.getTime() - offsetMillis;
+  const bookingById = new Map(bookings.map((booking) => [booking.id, booking]));
+  const overdueCandidateIds = dispatches
+    .filter((dispatch) => {
+      const booking = bookingById.get(dispatch.bookingId);
+      return (
+        (dispatch.status === "dispatched" || dispatch.status === "delivered") &&
+        booking?.endDateMillis !== null &&
+        booking?.endDateMillis !== undefined &&
+        booking.endDateMillis < todayMillis
+      );
+    })
+    .map((dispatch) => dispatch.bookingId);
+  const returnRecordsById = new Map<string, DashboardReturn>();
+  pendingReturnsSnapshot.docs.forEach((snapshot) => {
+    returnRecordsById.set(snapshot.id, {
+      bookingId: snapshot.id,
+      status: "pending_inspection",
+    });
+  });
+  const returnRefs = overdueCandidateIds.map((id) =>
+    db().collection("returns").doc(id),
+  );
+  for (let index = 0; index < returnRefs.length; index += 250) {
+    const batch = returnRefs.slice(index, index + 250);
+    const snapshots = await db().getAll(...batch);
+    snapshots.forEach((snapshot) => {
+      if (!snapshot.exists) return;
+      const status = snapshot.data()?.status;
+      returnRecordsById.set(snapshot.id, {
+        bookingId: snapshot.id,
+        status: typeof status === "string" ? status : "",
+      });
+    });
+  }
+
+  return {
+    ...summarizeOperations(
+      nowMillis,
+      timeZoneOffsetMinutes,
+      bookings,
+      equipment,
+      dispatches,
+      [...returnRecordsById.values()],
+    ),
+    generatedAtMillis: nowMillis,
+  };
 });
