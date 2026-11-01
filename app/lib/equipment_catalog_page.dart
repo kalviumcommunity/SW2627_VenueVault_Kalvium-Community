@@ -413,11 +413,15 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
           return wide
               ? Row(
                   children: cards
+                      .asMap()
+                      .entries
                       .map(
-                        (card) => Expanded(
+                        (entry) => Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: card,
+                            padding: EdgeInsets.only(
+                              right: entry.key == cards.length - 1 ? 0 : 10,
+                            ),
+                            child: entry.value,
                           ),
                         ),
                       )
@@ -429,7 +433,7 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
                   children: cards
                       .map(
                         (card) => SizedBox(
-                          width: (constraints.maxWidth - 10) / 2,
+                          width: ((constraints.maxWidth - 10) / 2).floorToDouble() - 0.5,
                           child: card,
                         ),
                       )
@@ -455,6 +459,7 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
             ),
           );
           final category = DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _categoryFilter,
             decoration: const InputDecoration(
               isDense: true,
@@ -472,6 +477,7 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
                 setState(() => _categoryFilter = value ?? 'All categories'),
           );
           final status = DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _statusFilter,
             decoration: const InputDecoration(
               isDense: true,
@@ -479,7 +485,7 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
             ),
             items: ['All statuses', ..._statuses]
                 .map(
-                  (value) => DropdownMenuItem(value: value, child: Text(value)),
+                  (value) => DropdownMenuItem(value: value, child: Text(value, overflow: TextOverflow.ellipsis)),
                 )
                 .toList(),
             onChanged: (value) =>
@@ -530,6 +536,7 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     elevation: 0,
+    margin: EdgeInsets.zero,
     color: Colors.white,
     child: Padding(
       padding: const EdgeInsets.all(16),
@@ -942,6 +949,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _categories.contains(_category)
                       ? _category
                       : 'Other',
@@ -997,6 +1005,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: _condition,
                         decoration: const InputDecoration(
                           labelText: 'Condition',
@@ -1016,6 +1025,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: _status,
                         decoration: const InputDecoration(labelText: 'Status'),
                         items: _statuses
