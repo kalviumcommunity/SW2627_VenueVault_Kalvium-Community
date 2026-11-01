@@ -72,8 +72,8 @@ service cloud.firestore {
     }
 
     match /equipment/{equipmentId} {
-      allow read: if hasPermission('inventory.view');
-      allow create, update, delete: if false;
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
     }
 
     match /bookings/{bookingId} {
