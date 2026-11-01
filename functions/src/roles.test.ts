@@ -33,8 +33,10 @@ test("dispatch staff only update dispatch status", () => {
 test("operations manager approves but does not manage users", () => {
   assert.equal(hasPermission("operations_manager", "returns.approve"), true);
   assert.equal(hasPermission("operations_manager", "conflicts.resolve"), true);
+  assert.equal(hasPermission("operations_manager", "dashboard.view"), true);
   assert.equal(hasPermission("operations_manager", "users.manage"), false);
   assert.equal(hasPermission("operations_manager", "settings.manage"), false);
+  assert.equal(hasPermission("booking_staff", "dashboard.view"), false);
 });
 
 test("unknown or missing roles get nothing", () => {

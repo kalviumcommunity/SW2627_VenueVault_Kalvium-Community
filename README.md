@@ -9,6 +9,7 @@ equipment booking, inventory, dispatch, and return tracking.
 - **Booking & Conflict Prevention**: Validate overlapping date ranges and equipment reservations before confirmation to prevent double-booking.
 - **Dispatch Management**: View daily dispatches, manage packing checklists, and update item status from warehouse to venue delivery.
 - **Return & Inspection Tracking**: Track returned gear, record damages or missing accessories, and restore inventory back to available stock.
+- **Operations Dashboard**: Show upcoming events, usable stock, open dispatches, overdue returns, pending inspections, and booking conflicts to authorized managers.
 - **Secure Multi-Role Access**: Backed by Firebase Authentication and Firestore security rules to protect operational and client data.
 
 ## Tech Stack
@@ -44,6 +45,37 @@ checked by both callable functions and Firestore rules. Booking, inventory,
 dispatch, and return mutations go through trusted Functions; Firestore client
 writes for those records are denied. A confirmed booking creates its dispatch
 at `dispatches/{bookingId}`, using the booking ID to make retries idempotent.
+
+The staff roles follow the operations responsibility matrix: Booking Staff can
+manage bookings; Warehouse Staff manage stock, checklists, and return
+inspections; Dispatch Staff can view assigned dispatches and update their
+statuses; Operations Managers can assign dispatches, approve returns, view the
+dashboard and audit trail, and review conflict reports. Admin has every
+defined application permission. Private user profile documents remain
+owner-readable; role assignment is handled through the Admin-authorized role
+management function. The current conflict screen is read-only; conflict
+resolution actions are not yet exposed in the app.
+
+### Assigning staff roles
+
+1. In Firebase Console, open **Authentication → Users**. Create the account if
+   needed and copy its UID. The Console manages accounts but does not edit
+   custom role claims.
+2. To create the first Admin, use a trusted Firebase Admin SDK environment to
+   set the user's custom claim to `{ "role": "admin" }`. The deployed
+   `setUserRole` callable is Admin-only, so it cannot create the first Admin.
+   Never put service-account credentials in the Flutter app or commit them.
+3. After an Admin exists, assign subsequent roles through the
+   Admin-authorized `setUserRole` callable with the target user's UID and one
+   of `booking_staff`, `warehouse_staff`, `dispatch_staff`,
+   `operations_manager`, or `admin`. There is currently no role-management
+   screen in the app, so this callable must be invoked by authorized
+   Admin-only tooling.
+4. Have the affected user sign out and back in to refresh the Firebase Auth
+   token. The app reads the role from the token's `role` custom claim.
+
+The emulator-only `functions/scripts/set-role.js` helper is for local
+development and must not be used to assign production roles.
 
 ## Local setup
 

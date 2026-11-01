@@ -3,6 +3,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import 'role_permissions.dart';
+
 const _categories = <String>[
   'Audio systems',
   'Speakers',
@@ -31,7 +33,7 @@ const _statuses = <String>[
 
 const _conditions = <String>['Excellent', 'Good', 'Fair', 'Poor'];
 
-enum _EquipmentAccess { viewOnly, stockUpdate, catalogManage }
+enum _EquipmentAccess { noAccess, viewOnly, stockUpdate, catalogManage }
 
 class EquipmentItem {
   const EquipmentItem({
@@ -116,18 +118,19 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
 
   Future<_EquipmentAccess> _loadEquipmentAccess() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return _EquipmentAccess.viewOnly;
-    try {
-      final token = await user.getIdTokenResult(true);
-      return switch (token.claims?['role']) {
-        'admin' => _EquipmentAccess.catalogManage,
-        'warehouse_staff' => _EquipmentAccess.stockUpdate,
-        _ => _EquipmentAccess.viewOnly,
-      };
-    } catch (_) {
-      // Hide management actions if the account role cannot be verified.
-      return _EquipmentAccess.viewOnly;
+    if (user == null) return _EquipmentAccess.noAccess;
+    final token = await user.getIdTokenResult(true);
+    final role = token.claims?['role'] as String?;
+    if (!hasRolePermission(role, 'inventory.view')) {
+      return _EquipmentAccess.noAccess;
     }
+    if (hasRolePermission(role, 'equipment.manage')) {
+      return _EquipmentAccess.catalogManage;
+    }
+    if (hasRolePermission(role, 'stock.update')) {
+      return _EquipmentAccess.stockUpdate;
+    }
+    return _EquipmentAccess.viewOnly;
   }
 
   @override
@@ -233,7 +236,22 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
     return FutureBuilder<_EquipmentAccess>(
       future: _accessFuture,
       builder: (context, accessSnapshot) {
-        final access = accessSnapshot.data ?? _EquipmentAccess.viewOnly;
+        if (accessSnapshot.hasError) {
+          return const Scaffold(
+            body: Center(child: Text('Could not load inventory permissions.')),
+          );
+        }
+        if (accessSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final access = accessSnapshot.data ?? _EquipmentAccess.noAccess;
+        if (access == _EquipmentAccess.noAccess) {
+          return const Scaffold(
+            body: Center(child: Text('You do not have access to inventory.')),
+          );
+        }
         final canManageCatalog = access == _EquipmentAccess.catalogManage;
         final canUpdateStock = access == _EquipmentAccess.stockUpdate;
         return Scaffold(

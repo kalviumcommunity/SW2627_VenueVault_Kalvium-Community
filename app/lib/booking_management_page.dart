@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'new_booking_page.dart';
+import 'role_permissions.dart';
 
 class BookingManagementPage extends StatelessWidget {
   const BookingManagementPage({super.key});
@@ -57,15 +59,51 @@ class BookingManagementPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('Sign in to view bookings.')),
+      );
+    }
+    return FutureBuilder<IdTokenResult>(
+      future: user.getIdTokenResult(true),
+      builder: (context, tokenSnapshot) {
+        if (tokenSnapshot.hasError) {
+          return const Scaffold(
+            body: Center(child: Text('Could not load booking permissions.')),
+          );
+        }
+        if (!tokenSnapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final role = tokenSnapshot.data!.claims?['role'] as String?;
+        if (!hasRolePermission(role, 'bookings.view')) {
+          return const Scaffold(
+            body: Center(child: Text('You do not have access to bookings.')),
+          );
+        }
+        return _buildForRole(context, role);
+      },
+    );
+  }
+
+  Widget _buildForRole(BuildContext context, String? role) {
+    final canCreate = hasRolePermission(role, 'bookings.create');
+    final canEdit = hasRolePermission(role, 'bookings.edit');
+    final canCancel = hasRolePermission(role, 'bookings.cancel');
     return Scaffold(
       appBar: AppBar(title: const Text('Bookings')),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: canCreate
+          ? FloatingActionButton.extended(
         onPressed: () => Navigator.of(
           context,
         ).push(MaterialPageRoute<void>(builder: (_) => const NewBookingPage())),
         icon: const Icon(Icons.add),
         label: const Text('New booking'),
-      ),
+      )
+          : null,
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _bookings.snapshots(),
         builder: (context, snapshot) {
@@ -85,7 +123,7 @@ class BookingManagementPage extends StatelessWidget {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(32),
-                child: Text('No bookings yet. Create one to get started.'),
+                child: Text('No bookings have been recorded.'),
               ),
             );
           }
@@ -141,26 +179,32 @@ class BookingManagementPage extends StatelessWidget {
                           Wrap(
                             spacing: 8,
                             children: [
-                              OutlinedButton.icon(
-                                onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => NewBookingPage(
-                                      initialBookingId: document.id,
-                                      initialBooking: data,
+                              if (canEdit)
+                                OutlinedButton.icon(
+                                  onPressed: () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => NewBookingPage(
+                                        initialBookingId: document.id,
+                                        initialBooking: data,
+                                      ),
                                     ),
                                   ),
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Edit'),
                                 ),
-                                icon: const Icon(Icons.edit_outlined, size: 18),
-                                label: const Text('Edit'),
-                              ),
-                              TextButton.icon(
-                                onPressed: () => _cancel(context, document.id),
-                                icon: const Icon(
-                                  Icons.cancel_outlined,
-                                  size: 18,
+                              if (canCancel)
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _cancel(context, document.id),
+                                  icon: const Icon(
+                                    Icons.cancel_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Cancel booking'),
                                 ),
-                                label: const Text('Cancel booking'),
-                              ),
                             ],
                           ),
                         ],

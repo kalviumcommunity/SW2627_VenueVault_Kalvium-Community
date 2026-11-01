@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'booking_management_page.dart';
 import 'conflict_detection_page.dart';
 import 'booking_calendar_page.dart';
 import 'operations_page.dart';
+import 'role_permissions.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -395,49 +397,7 @@ class HomePage extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 24),
-              const Row(
-                children: [
-                  Expanded(
-                    child: _SummaryCard(
-                      label: 'Active bookings',
-                      value: '12',
-                      icon: Icons.calendar_month,
-                      color: Colors.indigo,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: _SummaryCard(
-                      label: 'Items dispatched',
-                      value: '28',
-                      icon: Icons.local_shipping_outlined,
-                      color: Colors.teal,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Row(
-                children: [
-                  Expanded(
-                    child: _SummaryCard(
-                      label: 'Due for return',
-                      value: '5',
-                      icon: Icons.assignment_return_outlined,
-                      color: Colors.orange,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: _SummaryCard(
-                      label: 'Low stock items',
-                      value: '3',
-                      icon: Icons.inventory_2_outlined,
-                      color: Colors.redAccent,
-                    ),
-                  ),
-                ],
-              ),
+              _OperationsDashboard(user: user),
               const SizedBox(height: 28),
               Text(
                 'Quick actions',
@@ -445,86 +405,476 @@ class HomePage extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
+              _HomeActions(user: user),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OperationsDashboard extends StatefulWidget {
+  const _OperationsDashboard({required this.user});
+
+  final User? user;
+
+  @override
+  State<_OperationsDashboard> createState() => _OperationsDashboardState();
+}
+
+class _OperationsDashboardState extends State<_OperationsDashboard> {
+  late Future<_OperationsDashboardData?> _dashboard;
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboard = _loadDashboard();
+  }
+
+  Future<_OperationsDashboardData?> _loadDashboard() async {
+    final user = widget.user ?? FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw StateError('Sign in to load the operations dashboard.');
+    }
+
+    final token = await user.getIdTokenResult(true);
+    final role = token.claims?['role'] as String?;
+    if (!hasRolePermission(role, 'dashboard.view')) return null;
+
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('getOperationsDashboard')
+        .call({
+          'timeZoneOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
+        });
+    return _OperationsDashboardData.from(result.data);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_OperationsDashboardData?>(
+      future: _dashboard,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Could not load the operations dashboard.'),
+                  const SizedBox(height: 4),
+                  Text('${snapshot.error}'),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() => _dashboard = _loadDashboard());
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ),
+                ],
+                    ),
+                  ),
+          );
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final data = snapshot.data;
+        if (data == null) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                  Expanded(
+                  child: Text(
+                    'Operations dashboard',
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                    ),
+                IconButton(
+                  tooltip: 'Refresh dashboard',
+                  onPressed: () {
+                    setState(() => _dashboard = _loadDashboard());
+                  },
+                  icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+            GridView.count(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.45,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+                children: [
+                _SummaryCard(
+                  label: 'Upcoming events (30 days)',
+                  value: '${data.upcomingEventCount}',
+                  icon: Icons.calendar_month,
+                  color: Colors.indigo,
+                    ),
+                _SummaryCard(
+                  label: 'Equipment records',
+                  value: '${data.equipmentCount}',
+                  icon: Icons.category_outlined,
+                  color: Colors.blueGrey,
+                  ),
+                _SummaryCard(
+                  label: 'Usable / total units',
+                  value: '${data.availableUnits} / ${data.totalUnits}',
+                      icon: Icons.inventory_2_outlined,
+                  color: Colors.teal,
+                ),
+                _SummaryCard(
+                  label: 'Unavailable units',
+                  value: '${data.unavailableUnits}',
+                  icon: Icons.report_gmailerrorred_outlined,
+                  color: Colors.orange,
+                ),
+                _SummaryCard(
+                  label: 'Open dispatches',
+                  value: '${data.pendingDispatchCount}',
+                  icon: Icons.local_shipping_outlined,
+                  color: Colors.blue,
+                ),
+                _SummaryCard(
+                  label: 'Overdue returns',
+                  value: '${data.overdueReturnCount}',
+                  icon: Icons.assignment_return_outlined,
+                  color: Colors.deepOrange,
+                ),
+                _SummaryCard(
+                  label: 'Conflicting bookings',
+                  value: '${data.conflictCount}',
+                  icon: Icons.warning_amber_rounded,
+                      color: Colors.redAccent,
+                    ),
+                _SummaryCard(
+                  label: 'Returns awaiting inspection',
+                  value: '${data.returnsPendingInspectionCount}',
+                  icon: Icons.fact_check_outlined,
+                  color: Colors.purple,
+                  ),
+                ],
+              ),
+            const SizedBox(height: 16),
+            _DashboardEntryList(
+              title: 'Upcoming events',
+              emptyMessage: 'No confirmed events in the next 30 days.',
+              entries: data.upcomingEvents,
+              datePrefix: 'Starts',
+              ),
+              const SizedBox(height: 12),
+            _DashboardEntryList(
+              title: 'Overdue returns',
+              emptyMessage: 'No overdue returns.',
+              entries: data.overdueReturns,
+              datePrefix: 'Ended',
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _HomeActions extends StatefulWidget {
+  const _HomeActions({required this.user});
+
+  final User? user;
+
+  @override
+  State<_HomeActions> createState() => _HomeActionsState();
+}
+
+class _HomeActionsState extends State<_HomeActions> {
+  late final Future<IdTokenResult?> _tokenFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _tokenFuture = _loadToken();
+  }
+
+  Future<IdTokenResult?> _loadToken() async {
+    final user = widget.user ?? FirebaseAuth.instance.currentUser;
+    return user?.getIdTokenResult(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<IdTokenResult?>(
+      future: _tokenFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text('Could not load your role permissions.');
+        }
+        if (!snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.done ||
+              snapshot.connectionState == ConnectionState.none) {
+            return const Text('Sign in to view available actions.');
+          }
+          return const Center(child: CircularProgressIndicator());
+        }
+        final role = snapshot.data!.claims?['role'] as String?;
+        final actions = <Widget>[];
+
+        void addAction({
+          required String permission,
+          required IconData icon,
+          required String title,
+          required String subtitle,
+          required WidgetBuilder builder,
+        }) {
+          if (!hasRolePermission(role, permission)) return;
+          if (actions.isNotEmpty) {
+            actions.add(const SizedBox(height: 10));
+          }
+          actions.add(
               _ActionTile(
+              icon: icon,
+              title: title,
+              subtitle: subtitle,
+              onTap: () =>
+                  Navigator.of(context)
+                      .push(MaterialPageRoute<void>(builder: builder)),
+            ),
+          );
+        }
+
+        addAction(
+          permission: 'bookings.create',
                 icon: Icons.add_circle_outline,
                 title: 'Create booking',
                 subtitle: 'Reserve equipment for a new event',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
                       builder: (_) => const NewBookingPage(),
-                    ),
                   );
-                },
-              ),
-              const SizedBox(height: 10),
-              _ActionTile(
+        addAction(
+          permission: 'inventory.view',
                 icon: Icons.inventory_2_outlined,
                 title: 'View inventory',
                 subtitle: 'Check availability and stock levels',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
                       builder: (_) => const EquipmentCatalogPage(),
-                    ),
                   );
-                },
-              ),
-              const SizedBox(height: 10),
-              _ActionTile(
+        addAction(
+          permission: 'bookings.view',
                 icon: Icons.calendar_month_outlined,
                 title: 'Manage bookings',
-                subtitle: 'View, edit, or cancel event reservations',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+          subtitle: 'View bookings and permitted booking actions',
                       builder: (_) => const BookingManagementPage(),
-                    ),
                   );
-                },
-              ),
-              const SizedBox(height: 10),
-              _ActionTile(
+        addAction(
+          permission: 'bookings.view',
                 icon: Icons.date_range_outlined,
                 title: 'Booking calendar',
-                subtitle: 'See reservations, event dates, and booking details',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+          subtitle: 'See reservations and event dates',
                       builder: (_) => const BookingCalendarPage(),
-                    ),
                   );
-                },
-              ),
-              const SizedBox(height: 10),
-              _ActionTile(
+        if (hasRolePermission(role, 'bookings.view') &&
+            hasRolePermission(role, 'inventory.view')) {
+          addAction(
+            permission: 'bookings.view',
                 icon: Icons.warning_amber_rounded,
-                title: 'Conflict Detection',
-                subtitle:
-                    'Shortages, booking conflicts and unavailable time windows',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+            title: 'Conflict detection',
+            subtitle: 'Review shortages, booking conflicts, and time windows',
                       builder: (_) => const ConflictDetectionPage(),
-                    ),
                   );
-                },
-              ),
-              const SizedBox(height: 10),
-              _ActionTile(
+        }
+        if (hasRolePermission(role, 'dispatch.viewAll') ||
+            hasRolePermission(role, 'dispatch.viewAssigned') ||
+            hasRolePermission(role, 'returns.record') ||
+            hasRolePermission(role, 'returns.approve')) {
+          addAction(
+            permission: hasRolePermission(role, 'dispatch.viewAll')
+                ? 'dispatch.viewAll'
+                : 'dispatch.viewAssigned',
                 icon: Icons.local_shipping_outlined,
                 title: 'Operations',
-                subtitle: 'Manage dispatches, checklists, and returns',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+            subtitle: 'Open dispatch, checklist, and return tasks',
                       builder: (_) => const OperationsPage(),
-                    ),
+          );
+        }
+
+        if (actions.isEmpty) {
+          return const Text(
+            'No workspace modules are assigned to your account. '
+            'Ask an Admin to review your role.',
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: actions,
                   );
                 },
+    );
+  }
+}
+
+class _OperationsDashboardData {
+  const _OperationsDashboardData({
+    required this.upcomingEventCount,
+    required this.equipmentCount,
+    required this.totalUnits,
+    required this.availableUnits,
+    required this.unavailableUnits,
+    required this.pendingDispatchCount,
+    required this.overdueReturnCount,
+    required this.conflictCount,
+    required this.returnsPendingInspectionCount,
+    required this.upcomingEvents,
+    required this.overdueReturns,
+  });
+
+  final int upcomingEventCount;
+  final int equipmentCount;
+  final int totalUnits;
+  final int availableUnits;
+  final int unavailableUnits;
+  final int pendingDispatchCount;
+  final int overdueReturnCount;
+  final int conflictCount;
+  final int returnsPendingInspectionCount;
+  final List<_DashboardEntry> upcomingEvents;
+  final List<_DashboardEntry> overdueReturns;
+
+  factory _OperationsDashboardData.from(Object? value) {
+    if (value is! Map) {
+      throw const FormatException('Dashboard response must be an object.');
+    }
+    final data = Map<String, dynamic>.from(value);
+
+    int readCount(String key) {
+      final count = data[key];
+      if (count is! num || !count.isFinite || count < 0 || count % 1 != 0) {
+        throw FormatException('Dashboard response has an invalid $key.');
+      }
+      return count.toInt();
+    }
+
+    List<_DashboardEntry> readEntries(
+      String key,
+      String idKey,
+      String dateKey,
+    ) {
+      final entries = data[key];
+      if (entries is! List) {
+        throw FormatException('Dashboard response has invalid $key.');
+      }
+      return entries.map((entry) {
+        if (entry is! Map) {
+          throw FormatException('Dashboard response has invalid $key entry.');
+        }
+        final row = Map<String, dynamic>.from(entry);
+        final id = row[idKey];
+        final eventName = row['eventName'];
+        final venue = row['venue'];
+        final date = row[dateKey];
+        if (id is! String ||
+            eventName is! String ||
+            venue is! String ||
+            date is! num ||
+            !date.isFinite) {
+          throw FormatException('Dashboard response has invalid $key entry.');
+        }
+        return _DashboardEntry(
+          eventName: eventName,
+          venue: venue,
+          dateMillis: date.toInt(),
+        );
+      }).toList();
+    }
+
+    return _OperationsDashboardData(
+      upcomingEventCount: readCount('upcomingEventCount'),
+      equipmentCount: readCount('equipmentCount'),
+      totalUnits: readCount('totalUnits'),
+      availableUnits: readCount('availableUnits'),
+      unavailableUnits: readCount('unavailableUnits'),
+      pendingDispatchCount: readCount('pendingDispatchCount'),
+      overdueReturnCount: readCount('overdueReturnCount'),
+      conflictCount: readCount('conflictCount'),
+      returnsPendingInspectionCount: readCount('returnsPendingInspectionCount'),
+      upcomingEvents: readEntries('upcomingEvents', 'id', 'startDateMillis'),
+      overdueReturns: readEntries(
+        'overdueReturns',
+        'bookingId',
+        'endDateMillis',
               ),
-            ],
+    );
+  }
+}
+
+class _DashboardEntry {
+  const _DashboardEntry({
+    required this.eventName,
+    required this.venue,
+    required this.dateMillis,
+  });
+
+  final String eventName;
+  final String venue;
+  final int dateMillis;
+
+  String get dateLabel {
+    final date = DateTime.fromMillisecondsSinceEpoch(dateMillis).toLocal();
+    return '${date.day}/${date.month}/${date.year}';
+  }
+}
+
+class _DashboardEntryList extends StatelessWidget {
+  const _DashboardEntryList({
+    required this.title,
+    required this.emptyMessage,
+    required this.entries,
+    required this.datePrefix,
+  });
+
+  final String title;
+  final String emptyMessage;
+  final List<_DashboardEntry> entries;
+  final String datePrefix;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            if (entries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(emptyMessage),
+              )
+            else
+              ...entries.map(
+                (entry) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(entry.eventName),
+                  subtitle: Text(
+                    '${entry.venue}\n$datePrefix ${entry.dateLabel}',
           ),
+                  isThreeLine: true,
+                ),
+              ),
+          ],
         ),
       ),
     );

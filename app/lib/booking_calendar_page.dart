@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'new_booking_page.dart';
+import 'role_permissions.dart';
 
 class BookingCalendarPage extends StatefulWidget {
   const BookingCalendarPage({super.key});
@@ -17,6 +19,18 @@ class _BookingCalendarPageState extends State<BookingCalendarPage> {
   DateTime _visibleMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime _selectedDate = DateUtils.dateOnly(DateTime.now());
   bool _showCancelled = false;
+  late final Future<IdTokenResult?> _roleFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _roleFuture = _loadRole();
+  }
+
+  Future<IdTokenResult?> _loadRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    return user?.getIdTokenResult(true);
+  }
 
   void _changeMonth(int amount) {
     setState(() {
@@ -27,6 +41,39 @@ class _BookingCalendarPageState extends State<BookingCalendarPage> {
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<IdTokenResult?>(
+      future: _roleFuture,
+      builder: (context, tokenSnapshot) {
+        if (tokenSnapshot.hasError) {
+          return const Scaffold(
+            body: Center(child: Text('Could not load calendar permissions.')),
+          );
+        }
+        if (!tokenSnapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final role = tokenSnapshot.data?.claims?['role'] as String?;
+        if (!hasRolePermission(role, 'bookings.view')) {
+          return const Scaffold(
+            body: Center(child: Text('You do not have access to bookings.')),
+          );
+        }
+        return _buildCalendar(
+          context,
+          canCreate: hasRolePermission(role, 'bookings.create'),
+          canEdit: hasRolePermission(role, 'bookings.edit'),
+        );
+      },
+    );
+  }
+
+  Widget _buildCalendar(
+    BuildContext context, {
+    required bool canCreate,
+    required bool canEdit,
+  }) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Booking calendar'),
@@ -39,13 +86,15 @@ class _BookingCalendarPageState extends State<BookingCalendarPage> {
           const SizedBox(width: 8),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: canCreate
+          ? FloatingActionButton.extended(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const NewBookingPage()),
         ),
         icon: const Icon(Icons.add),
         label: const Text('New booking'),
-      ),
+      )
+          : null,
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance.collection('bookings').snapshots(),
         builder: (context, snapshot) {
@@ -144,6 +193,7 @@ class _BookingCalendarPageState extends State<BookingCalendarPage> {
                           date: _selectedDate,
                           bookings: bookings.where((booking) => booking.includes(_selectedDate)).toList(),
                           compact: compact,
+                          canEdit: canEdit,
                         ),
                       ],
                     ),
@@ -315,11 +365,12 @@ class _CalendarDayCell extends StatelessWidget {
 }
 
 class _SelectedDayBookings extends StatelessWidget {
-  const _SelectedDayBookings({required this.date, required this.bookings, required this.compact});
+  const _SelectedDayBookings({required this.date, required this.bookings, required this.compact, required this.canEdit});
 
   final DateTime date;
   final List<_CalendarBooking> bookings;
   final bool compact;
+  final bool canEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -350,16 +401,17 @@ class _SelectedDayBookings extends StatelessWidget {
             ),
           )
         else
-          ...bookings.map((booking) => _BookingCard(booking: booking, compact: compact)),
+          ...bookings.map((booking) => _BookingCard(booking: booking, compact: compact, canEdit: canEdit)),
       ],
     );
   }
 }
 
 class _BookingCard extends StatelessWidget {
-  const _BookingCard({required this.booking, required this.compact});
+  const _BookingCard({required this.booking, required this.compact, required this.canEdit});
   final _CalendarBooking booking;
   final bool compact;
+  final bool canEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -369,7 +421,7 @@ class _BookingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _showBookingDetails(context, booking),
+        onTap: () => _showBookingDetails(context, booking, canEdit: canEdit),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -476,7 +528,7 @@ class _CalendarBooking {
   }
 }
 
-void _showBookingDetails(BuildContext context, _CalendarBooking booking) {
+void _showBookingDetails(BuildContext context, _CalendarBooking booking, {required bool canEdit}) {
   showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
@@ -509,7 +561,7 @@ void _showBookingDetails(BuildContext context, _CalendarBooking booking) {
         ),
       ),
       actions: [
-        if (!booking.isCancelled)
+        if (canEdit && !booking.isCancelled)
           TextButton.icon(
             onPressed: () {
               final navigator = Navigator.of(context);
