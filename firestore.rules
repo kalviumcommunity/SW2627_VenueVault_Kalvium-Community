@@ -189,15 +189,66 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    function validDispatch(data) {
+      return data.keys().hasOnly([
+          'bookingId', 'eventName', 'venue', 'dispatchDate', 'dispatchTime',
+          'pickupDate', 'assignedStaffName', 'assignedStaffUid', 'items',
+          'status', 'transportReference', 'createdBy', 'updatedBy', 'updatedAt'
+        ]) &&
+        data.bookingId is string &&
+        data.eventName is string && data.eventName.size() > 0 &&
+        data.venue is string && data.venue.size() > 0 &&
+        data.dispatchDate is timestamp &&
+        data.dispatchTime is timestamp &&
+        data.pickupDate is timestamp &&
+        data.assignedStaffName is string &&
+        data.items is list && data.items.size() > 0 &&
+        data.status in [
+          'pending', 'preparing', 'ready', 'dispatched', 'delivered',
+          'returned', 'completed'
+        ] &&
+        data.createdBy is string &&
+        data.updatedBy is string &&
+        data.updatedAt is timestamp;
+    }
+
     match /dispatches/{dispatchId} {
-      allow get, list: if hasPermission('dispatch.viewAll') ||
+      allow get: if hasPermission('dispatch.viewAll') ||
+        (hasPermission('dispatch.viewAssigned') &&
+          resource.data.assignedStaffUid == request.auth.uid) ||
+        (hasPermission('bookings.edit') &&
+          (resource.data.bookingId == dispatchId ||
+            !exists(
+              /databases/$(database)/documents/dispatches/$(dispatchId)
+            )));
+      allow list: if hasPermission('dispatch.viewAll') ||
         (hasPermission('dispatch.viewAssigned') &&
           resource.data.assignedStaffUid == request.auth.uid);
-      allow create: if false;
+      allow create: if validDispatch(request.resource.data) &&
+        request.resource.data.bookingId == dispatchId &&
+        (
+          hasPermission('dispatch.assign') ||
+          (
+            hasPermission('bookings.create') &&
+            getAfter(
+              /databases/$(database)/documents/bookings/$(dispatchId)
+            ).data.status == 'confirmed' &&
+            getAfter(
+              /databases/$(database)/documents/bookings/$(dispatchId)
+            ).data.createdBy == request.auth.uid
+          )
+        );
       allow update: if hasPermission('dispatch.assign') ||
         hasPermission('checklist.manage') ||
         (hasPermission('dispatch.updateStatus') &&
-          resource.data.assignedStaffUid == request.auth.uid);
+          resource.data.assignedStaffUid == request.auth.uid) ||
+        (hasPermission('bookings.edit') &&
+          validDispatch(request.resource.data) &&
+          request.resource.data.bookingId == dispatchId &&
+          request.resource.data.status == resource.data.status &&
+          getAfter(
+            /databases/$(database)/documents/bookings/$(dispatchId)
+          ).data.status == 'confirmed');
       allow delete: if false;
     }
 
