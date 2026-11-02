@@ -119,7 +119,7 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
   Future<_EquipmentAccess> _loadEquipmentAccess() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return _EquipmentAccess.noAccess;
-    final token = await user.getIdTokenResult(true);
+    final token = await user.getIdTokenResult(false);
     final role = token.claims?['role'] as String?;
     if (!hasRolePermission(role, 'inventory.view')) {
       return _EquipmentAccess.noAccess;

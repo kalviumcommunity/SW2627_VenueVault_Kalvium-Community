@@ -70,7 +70,7 @@ class BookingManagementPage extends StatelessWidget {
       );
     }
     return FutureBuilder<IdTokenResult>(
-      future: user.getIdTokenResult(true),
+      future: user.getIdTokenResult(false),
       builder: (context, tokenSnapshot) {
         if (tokenSnapshot.hasError) {
           return const Scaffold(

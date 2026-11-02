@@ -17,8 +17,8 @@ class AvailabilityEngine {
     String? ignoreBookingId,
   }) {
     final reserved = <String, int>{};
-    final requestedStart = _dateOnly(dates.start);
-    final requestedEnd = _dateOnly(dates.end);
+    final requestedStart = dates.start;
+    final requestedEnd = dates.end;
 
     for (final booking in bookings) {
       if (booking.id == ignoreBookingId) continue;
@@ -32,8 +32,7 @@ class AvailabilityEngine {
       if (start == null || end == null || end.isBefore(start)) continue;
 
       // Date ranges are inclusive because the booking form selects event days.
-      if (_dateOnly(start).isAfter(requestedEnd) ||
-          _dateOnly(end).isBefore(requestedStart)) {
+      if (start.isAfter(requestedEnd) || end.isBefore(requestedStart)) {
         continue;
       }
 
@@ -80,7 +79,4 @@ class AvailabilityEngine {
     if (value is String) return DateTime.tryParse(value);
     return null;
   }
-
-  static DateTime _dateOnly(DateTime value) =>
-      DateTime(value.year, value.month, value.day);
 }

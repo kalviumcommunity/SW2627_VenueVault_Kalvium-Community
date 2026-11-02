@@ -657,7 +657,7 @@ class _OperationsDashboardState extends State<_OperationsDashboard> {
       throw StateError('Sign in to load the operations dashboard.');
     }
 
-    final token = await user.getIdTokenResult(true);
+    final token = await user.getIdTokenResult(false);
     final role = token.claims?['role'] as String?;
     if (!hasRolePermission(role, 'dashboard.view')) return null;
 
@@ -917,7 +917,7 @@ class _HomeActionsState extends State<_HomeActions> {
 
   Future<IdTokenResult?> _loadToken() async {
     final user = widget.user ?? FirebaseAuth.instance.currentUser;
-    return user?.getIdTokenResult(true);
+    return user?.getIdTokenResult(false);
   }
 
   @override

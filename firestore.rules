@@ -118,7 +118,8 @@ service cloud.firestore {
     function validReturn(data) {
       return data.keys().hasOnly([
           'bookingId', 'eventName', 'items', 'status', 'recordedBy',
-          'recordedAt', 'approvedBy', 'approvedAt'
+            'recordedAt', 'returnConfirmedBy', 'returnConfirmedAt',
+            'approvedBy', 'approvedAt'
         ]) &&
         data.bookingId is string && data.bookingId.size() > 0 &&
         data.eventName is string && data.eventName.size() > 0 &&
@@ -127,6 +128,11 @@ service cloud.firestore {
         data.status in ['pending_inspection', 'approved'] &&
         data.recordedBy is string && data.recordedBy.size() <= 128 &&
         data.recordedAt is timestamp &&
+        (!('returnConfirmedBy' in data) ||
+          (data.returnConfirmedBy is string &&
+            data.returnConfirmedBy.size() <= 128)) &&
+        (!('returnConfirmedAt' in data) ||
+          data.returnConfirmedAt is timestamp) &&
         (!('approvedBy' in data) || data.approvedBy == null ||
           (data.approvedBy is string && data.approvedBy.size() <= 128)) &&
         (!('approvedAt' in data) || data.approvedAt == null ||
@@ -145,6 +151,10 @@ service cloud.firestore {
       allow update: if (hasPermission('equipment.manage') &&
           validEquipment(request.resource.data)) ||
         (hasPermission('returns.approve') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'unavailableQuantity', 'updatedAt'
+          ])) ||
+        (hasPermission('returns.record') &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'unavailableQuantity', 'updatedAt'
           ])) ||
@@ -198,7 +208,9 @@ service cloud.firestore {
         validReturn(request.resource.data) &&
         request.resource.data.status == 'pending_inspection' &&
         request.resource.data.recordedBy == request.auth.uid &&
-        request.resource.data.recordedAt is timestamp;
+        request.resource.data.recordedAt is timestamp &&
+        request.resource.data.returnConfirmedBy == request.auth.uid &&
+        request.resource.data.returnConfirmedAt is timestamp;
       allow update: if hasPermission('returns.approve') &&
           validReturn(request.resource.data) &&
           resource.data.status == 'pending_inspection' &&
