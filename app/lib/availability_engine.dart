@@ -44,8 +44,11 @@ class AvailabilityEngine {
         final id = (item['equipmentId'] ?? item['id'])?.toString();
         final quantity = item['quantity'];
         if (id == null || quantity is! num || quantity <= 0) continue;
-        reserved.update(id, (current) => current + quantity.toInt(),
-            ifAbsent: () => quantity.toInt());
+        reserved.update(
+          id,
+          (current) => current + quantity.toInt(),
+          ifAbsent: () => quantity.toInt(),
+        );
       }
     }
 
@@ -62,11 +65,11 @@ class AvailabilityEngine {
     }
     // availableQuantity is the catalog's usable stock; fall back to total for
     // older records that do not have the field.
-    final available = (data['availableQuantity'] as num?)?.toInt() ??
+    final available =
+        (data['availableQuantity'] as num?)?.toInt() ??
         (data['totalQuantity'] as num?)?.toInt() ??
         0;
-    final unavailable =
-        (data['unavailableQuantity'] as num?)?.toInt() ?? 0;
+    final unavailable = (data['unavailableQuantity'] as num?)?.toInt() ?? 0;
     final usable = (available - unavailable).clamp(0, available);
     return (usable - reserved).clamp(0, usable);
   }

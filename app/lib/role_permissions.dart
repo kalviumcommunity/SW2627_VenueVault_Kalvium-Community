@@ -25,6 +25,8 @@ const Map<String, Set<String>> _rolePermissions = {
   'operations_manager': {
     'inventory.view',
     'bookings.view',
+    'bookings.create',
+    'bookings.edit',
     'conflicts.resolve',
     'approvals.decide',
     'dispatch.viewAll',

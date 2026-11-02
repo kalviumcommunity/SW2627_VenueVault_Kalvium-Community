@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -90,19 +89,23 @@ class _DispatchList extends StatelessWidget {
       future: FirebaseAuth.instance.currentUser!.getIdTokenResult(true),
       builder: (context, tokenSnapshot) {
         if (tokenSnapshot.hasError) {
-          return const Center(child: Text('Could not load dispatch permissions.'));
+          return const Center(
+            child: Text('Could not load dispatch permissions.'),
+          );
         }
         if (!tokenSnapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final role = tokenSnapshot.data!.claims?['role'] as String? ?? '';
-        final canManageChecklist =
-            hasRolePermission(role, 'checklist.manage');
+        final canManageChecklist = hasRolePermission(role, 'checklist.manage');
         final canAssign = hasRolePermission(role, 'dispatch.assign');
-        final canUpdateStatus =
-            hasRolePermission(role, 'dispatch.updateStatus');
+        final canUpdateStatus = hasRolePermission(
+          role,
+          'dispatch.updateStatus',
+        );
         final query = FirebaseFirestore.instance.collection('dispatches');
-        final stream = hasRolePermission(role, 'dispatch.viewAssigned') &&
+        final stream =
+            hasRolePermission(role, 'dispatch.viewAssigned') &&
                 !hasRolePermission(role, 'dispatch.viewAll')
             ? query.where('assignedStaffUid', isEqualTo: uid).snapshots()
             : query.snapshots();
@@ -159,8 +162,7 @@ class _DispatchList extends StatelessWidget {
                             contentPadding: EdgeInsets.zero,
                             dense: true,
                             value: packed,
-                            secondary:
-                                canManageChecklist
+                            secondary: canManageChecklist
                                 ? IconButton(
                                     tooltip: item['missing'] == true
                                         ? 'Clear missing status'
@@ -185,8 +187,7 @@ class _DispatchList extends StatelessWidget {
                                     'Missing item — report before dispatch',
                                   )
                                 : null,
-                            onChanged:
-                                canManageChecklist
+                            onChanged: canManageChecklist
                                 ? (value) =>
                                       _dispatchUpdate(context, document.id, {
                                         'checklistIndex': entry.$1,
@@ -566,14 +567,49 @@ Future<void> _showRecordReturn(
           'condition': damaged > 0 ? 'damaged' : 'good',
         };
       }).toList();
-      final requestId = FirebaseFirestore.instance
-          .collection('returns')
-          .doc()
-          .id;
-      await FirebaseFunctions.instance.httpsCallable('recordReturn').call({
-        'bookingId': bookingId,
-        'requestId': requestId,
-        'items': items,
+      final db = FirebaseFirestore.instance;
+      final bookingRef = db.collection('bookings').doc(bookingId);
+      final returnRef = db.collection('returns').doc(bookingId);
+      final bookingSnapshot = await bookingRef.get();
+      if (!bookingSnapshot.exists) throw StateError('Booking not found.');
+      final bookingData = bookingSnapshot.data()!;
+      if (bookingData['status'] != 'confirmed') {
+        throw StateError('Only confirmed bookings can be returned.');
+      }
+      await db.runTransaction((transaction) async {
+        final currentReturn = await transaction.get(returnRef);
+        if (currentReturn.exists) return;
+        final equipmentRefs = items
+            .map(
+              (item) =>
+                  db.collection('equipment').doc(item['equipmentId'] as String),
+            )
+            .toList();
+        final equipmentSnapshots = await Future.wait(
+          equipmentRefs.map(transaction.get),
+        );
+        for (var index = 0; index < items.length; index++) {
+          final data = equipmentSnapshots[index].data() ?? {};
+          final unavailable =
+              (data['unavailableQuantity'] as num?)?.toInt() ?? 0;
+          final held =
+              (items[index]['returnedQuantity'] as int) +
+              (items[index]['missingQuantity'] as int);
+          transaction.update(equipmentRefs[index], {
+            'unavailableQuantity': unavailable + held,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+        transaction.set(returnRef, {
+          'bookingId': bookingId,
+          'eventName': bookingData['eventName'] ?? 'Event booking',
+          'items': items,
+          'status': 'pending_inspection',
+          'recordedBy': FirebaseAuth.instance.currentUser!.uid,
+          'recordedAt': FieldValue.serverTimestamp(),
+          'approvedBy': null,
+          'approvedAt': null,
+        });
       });
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -585,7 +621,12 @@ Future<void> _showRecordReturn(
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(error.message)));
       }
-    } on FirebaseFunctionsException catch (error) {
+    } on StateError catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on FirebaseException catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(error.message ?? 'Could not record return.')),
@@ -625,12 +666,16 @@ Future<void> _dispatchUpdate(
   Map<String, dynamic> update,
 ) async {
   try {
-    await FirebaseFunctions.instance.httpsCallable('updateDispatch').call({
-      'dispatchId': dispatchId,
-      'requestId': FirebaseFirestore.instance.collection('auditLogs').doc().id,
-      ...update,
-    });
-  } on FirebaseFunctionsException catch (error) {
+    await FirebaseFirestore.instance
+        .collection('dispatches')
+        .doc(dispatchId)
+        .update({...update, 'updatedAt': FieldValue.serverTimestamp()});
+  } on StateError catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  } on FirebaseException catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.message ?? 'Dispatch update failed.')),
@@ -718,11 +763,74 @@ Future<void> _assignDispatch(BuildContext context, String dispatchId) async {
 
 Future<void> _approveReturn(BuildContext context, String returnId) async {
   try {
-    await FirebaseFunctions.instance.httpsCallable('approveReturn').call({
-      'returnId': returnId,
-      'requestId': FirebaseFirestore.instance.collection('auditLogs').doc().id,
+    final db = FirebaseFirestore.instance;
+    final returnRef = db.collection('returns').doc(returnId);
+    final returnSnapshot = await returnRef.get();
+    final data = returnSnapshot.data();
+    if (!returnSnapshot.exists || data == null) {
+      throw StateError('Return record not found.');
+    }
+    final bookingId = data['bookingId'] as String? ?? returnId;
+    final items = (data['items'] as List?)?.whereType<Map>().toList() ?? [];
+    await db.runTransaction((transaction) async {
+      final bookingRef = db.collection('bookings').doc(bookingId);
+      final dispatchRef = db.collection('dispatches').doc(bookingId);
+      final bookingSnapshot = await transaction.get(bookingRef);
+      final dispatchSnapshot = await transaction.get(dispatchRef);
+      if (!bookingSnapshot.exists ||
+          bookingSnapshot.data()?['status'] != 'confirmed') {
+        throw StateError('Only confirmed bookings can be approved.');
+      }
+      final equipmentRefs = items
+          .map(
+            (item) =>
+                db.collection('equipment').doc(item['equipmentId'] as String),
+          )
+          .toList();
+      final equipmentSnapshots = await Future.wait(
+        equipmentRefs.map(transaction.get),
+      );
+      for (var index = 0; index < items.length; index++) {
+        final ref = equipmentRefs[index];
+        final snapshot = equipmentSnapshots[index];
+        if (!snapshot.exists) {
+          throw StateError('Equipment record not found.');
+        }
+        final equipment = snapshot.data() ?? {};
+        final unavailable =
+            (equipment['unavailableQuantity'] as num?)?.toInt() ?? 0;
+        final released =
+            ((items[index]['returnedQuantity'] as num?)?.toInt() ?? 0) -
+            ((items[index]['damagedQuantity'] as num?)?.toInt() ?? 0);
+        transaction.update(ref, {
+          'unavailableQuantity': (unavailable - released).clamp(0, 1000000),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      transaction.update(returnRef, {
+        'status': 'approved',
+        'approvedBy': FirebaseAuth.instance.currentUser!.uid,
+        'approvedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.update(bookingRef, {
+        'status': 'returned',
+        'returnedAt': FieldValue.serverTimestamp(),
+        'updatedBy': FirebaseAuth.instance.currentUser!.uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      if (dispatchSnapshot.exists) {
+        transaction.update(dispatchRef, {
+          'status': 'completed',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
     });
-  } on FirebaseFunctionsException catch (error) {
+  } on StateError catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  } on FirebaseException catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -774,18 +882,49 @@ Future<void> _resolveIssue(
     return;
   }
   try {
-    await FirebaseFunctions.instance
-        .httpsCallable('resolveUnavailableEquipment')
-        .call({
-          'returnId': returnId,
-          'equipmentId': item['equipmentId'],
-          'quantity': quantity,
-          'requestId': FirebaseFirestore.instance
-              .collection('auditLogs')
-              .doc()
-              .id,
-        });
-  } on FirebaseFunctionsException catch (error) {
+    final db = FirebaseFirestore.instance;
+    final returnRef = db.collection('returns').doc(returnId);
+    final equipmentRef = db
+        .collection('equipment')
+        .doc(item['equipmentId'] as String);
+    await db.runTransaction((transaction) async {
+      final returnSnapshot = await transaction.get(returnRef);
+      final equipmentSnapshot = await transaction.get(equipmentRef);
+      final data = returnSnapshot.data();
+      final equipment = equipmentSnapshot.data();
+      if (data == null || equipment == null || data['status'] != 'approved') {
+        throw StateError('Only approved return issues can be resolved.');
+      }
+      final items = (data['items'] as List?)?.toList() ?? [];
+      final index = items.indexWhere(
+        (entry) => entry is Map && entry['equipmentId'] == item['equipmentId'],
+      );
+      if (index < 0) throw StateError('Equipment is not part of this return.');
+      final current = Map<String, dynamic>.from(items[index] as Map);
+      final resolved = (current['resolvedQuantity'] as num?)?.toInt() ?? 0;
+      final unavailable =
+          (equipment['unavailableQuantity'] as num?)?.toInt() ?? 0;
+      if (quantity > unavailable ||
+          quantity >
+              ((current['damagedQuantity'] as num?)?.toInt() ?? 0) +
+                  ((current['missingQuantity'] as num?)?.toInt() ?? 0) -
+                  resolved) {
+        throw StateError('Resolution exceeds the unresolved quantity.');
+      }
+      transaction.update(equipmentRef, {
+        'unavailableQuantity': unavailable - quantity,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      current['resolvedQuantity'] = resolved + quantity;
+      items[index] = current;
+      transaction.update(returnRef, {'items': items});
+    });
+  } on StateError catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  } on FirebaseException catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.message ?? 'Could not resolve issue.')),

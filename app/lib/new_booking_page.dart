@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import 'availability_engine.dart';
+import 'role_permissions.dart';
 
 class NewBookingPage extends StatefulWidget {
   const NewBookingPage({super.key, this.initialBookingId, this.initialBooking});
@@ -101,6 +103,22 @@ class _NewBookingPageState extends State<NewBookingPage> {
 
     setState(() => _saving = true);
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw StateError('Sign in before saving a booking.');
+      }
+      final token = await user.getIdTokenResult();
+      final role = token.claims?['role'] as String?;
+      final requiredPermission = widget.initialBookingId == null
+          ? 'bookings.create'
+          : 'bookings.edit';
+      if (!hasRolePermission(role, requiredPermission)) {
+        throw StateError(
+          'Your account does not have permission to '
+          '${widget.initialBookingId == null ? 'create' : 'edit'} bookings. '
+          'Use a booking staff account.',
+        );
+      }
       final db = FirebaseFirestore.instance;
       final equipmentSnapshot = await db.collection('equipment').get();
       final bookingsSnapshot = await db.collection('bookings').get();
@@ -124,7 +142,9 @@ class _NewBookingPageState extends State<NewBookingPage> {
         }
       }
       if (shortfalls.isNotEmpty) {
-        _message('Not enough stock for the selected dates. ${shortfalls.join('; ')}');
+        _message(
+          'Not enough stock for the selected dates. ${shortfalls.join('; ')}',
+        );
         return;
       }
       final items = _selectedInventory.entries.map((entry) {
@@ -144,23 +164,46 @@ class _NewBookingPageState extends State<NewBookingPage> {
         'venue': _venueController.text.trim(),
         'staffName': _staffController.text.trim(),
         'notes': _notesController.text.trim(),
-        'startDate': _dateOnly(_selectedDates!.start).millisecondsSinceEpoch,
-        'endDate': _dateOnly(_selectedDates!.end).millisecondsSinceEpoch,
+        'startDate': Timestamp.fromDate(_dateOnly(_selectedDates!.start)),
+        'endDate': Timestamp.fromDate(_dateOnly(_selectedDates!.end)),
         'items': items,
       };
       final requestId = db.collection('bookings').doc().id;
-      await FirebaseFunctions.instance.httpsCallable('saveBooking').call({
-        'requestId': requestId,
-        if (widget.initialBookingId != null)
-          'bookingId': widget.initialBookingId,
-        'booking': data,
+      final bookingRef = db
+          .collection('bookings')
+          .doc(widget.initialBookingId ?? requestId);
+      final existing = widget.initialBookingId == null
+          ? null
+          : await bookingRef.get();
+      if (widget.initialBookingId != null && !existing!.exists) {
+        throw StateError('The booking no longer exists.');
+      }
+      final bookingData = <String, dynamic>{
+        ...data,
+        'status': existing?.data()?['status'] ?? 'confirmed',
+        'updatedBy': user.uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (existing == null) ...{
+          'createdBy': user.uid,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+      };
+      await db.runTransaction((transaction) async {
+        final currentBooking = await transaction.get(bookingRef);
+        if (currentBooking.exists) {
+          transaction.update(bookingRef, bookingData);
+        } else {
+          transaction.set(bookingRef, bookingData);
+        }
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.initialBookingId == null
-                ? 'Booking created.'
-                : 'Booking updated.'),
+            content: Text(
+              widget.initialBookingId == null
+                  ? 'Booking created.'
+                  : 'Booking updated.',
+            ),
           ),
         );
         Navigator.of(context).pop();
@@ -173,16 +216,15 @@ class _NewBookingPageState extends State<NewBookingPage> {
   }
 
   void _message(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _selectDates() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final firstDate = _selectedDates != null &&
-            _selectedDates!.start.isBefore(today)
+    final firstDate =
+        _selectedDates != null && _selectedDates!.start.isBefore(today)
         ? _selectedDates!.start
         : today;
     final selectedDates = await showDateRangePicker(
@@ -267,11 +309,13 @@ class _NewBookingPageState extends State<NewBookingPage> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.save_outlined),
-          label: Text(_saving
-              ? 'Saving…'
-              : widget.initialBookingId == null
-                  ? 'Create booking'
-                  : 'Save changes'),
+          label: Text(
+            _saving
+                ? 'Saving…'
+                : widget.initialBookingId == null
+                ? 'Create booking'
+                : 'Save changes',
+          ),
         ),
       ),
     );
@@ -454,23 +498,41 @@ class _InventoryReadyState extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
-        Text('Booking details',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-            )),
+        Text(
+          'Booking details',
+          style: Theme.of(context).textTheme.titleLarge
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 12),
-        _bookingField(customerController, 'Customer name *', Icons.person_outline),
+        _bookingField(
+          customerController,
+          'Customer name *',
+          Icons.person_outline,
+        ),
         const SizedBox(height: 10),
-        _bookingField(phoneController, 'Customer phone', Icons.phone_outlined,
-            keyboardType: TextInputType.phone),
+        _bookingField(
+          phoneController,
+          'Customer phone',
+          Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
+        ),
         const SizedBox(height: 10),
         _bookingField(eventController, 'Event name *', Icons.event_outlined),
         const SizedBox(height: 10),
         _bookingField(venueController, 'Venue *', Icons.place_outlined),
         const SizedBox(height: 10),
-        _bookingField(staffController, 'Assigned staff *', Icons.badge_outlined),
+        _bookingField(
+          staffController,
+          'Assigned staff *',
+          Icons.badge_outlined,
+        ),
         const SizedBox(height: 10),
-        _bookingField(notesController, 'Notes', Icons.notes_outlined, maxLines: 2),
+        _bookingField(
+          notesController,
+          'Notes',
+          Icons.notes_outlined,
+          maxLines: 2,
+        ),
         const SizedBox(height: 24),
         Row(
           children: [
@@ -543,7 +605,8 @@ class _InventoryReadyState extends StatelessWidget {
                     message: 'Check Firestore access rules and try again.',
                   );
                 }
-                if (bookingSnapshot.connectionState == ConnectionState.waiting) {
+                if (bookingSnapshot.connectionState ==
+                    ConnectionState.waiting) {
                   return const Padding(
                     padding: EdgeInsets.all(32),
                     child: Center(child: CircularProgressIndicator()),
@@ -557,67 +620,68 @@ class _InventoryReadyState extends StatelessWidget {
                   ignoreBookingId: ignoreBookingId,
                 );
                 final query = searchText.toLowerCase();
-                final equipment = docs.where((document) {
-                  final data = document.data();
-                  final available = availability[document.id] ?? 0;
-                  if (available <= 0) {
-                    return false;
-                  }
-                  if (query.isEmpty) return true;
-                  return (data['name'] as String? ?? '').toLowerCase().contains(
-                        query,
-                      ) ||
-                      (data['category'] as String? ?? '')
-                          .toLowerCase()
-                          .contains(query) ||
-                      (data['description'] as String? ?? '')
-                          .toLowerCase()
-                          .contains(query);
-                }).toList()..sort((a, b) {
-                  final aName = a.data()['name'] as String? ?? '';
-                  final bName = b.data()['name'] as String? ?? '';
-                  return aName.toLowerCase().compareTo(bName.toLowerCase());
-                });
+                final equipment =
+                    docs.where((document) {
+                      final data = document.data();
+                      final available = availability[document.id] ?? 0;
+                      if (available <= 0) {
+                        return false;
+                      }
+                      if (query.isEmpty) return true;
+                      return (data['name'] as String? ?? '')
+                              .toLowerCase()
+                              .contains(query) ||
+                          (data['category'] as String? ?? '')
+                              .toLowerCase()
+                              .contains(query) ||
+                          (data['description'] as String? ?? '')
+                              .toLowerCase()
+                              .contains(query);
+                    }).toList()..sort((a, b) {
+                      final aName = a.data()['name'] as String? ?? '';
+                      final bName = b.data()['name'] as String? ?? '';
+                      return aName.toLowerCase().compareTo(bName.toLowerCase());
+                    });
 
-            if (equipment.isEmpty) {
-              return _InventoryMessage(
-                icon: query.isEmpty
-                    ? Icons.inventory_2_outlined
-                    : Icons.search_off,
-                title: query.isEmpty
-                    ? 'No available equipment'
-                    : 'No matching equipment',
-                message: query.isEmpty
-                    ? 'Add equipment to the catalog or update its available quantity.'
-                    : 'Try another search term.',
-              );
-            }
+                if (equipment.isEmpty) {
+                  return _InventoryMessage(
+                    icon: query.isEmpty
+                        ? Icons.inventory_2_outlined
+                        : Icons.search_off,
+                    title: query.isEmpty
+                        ? 'No available equipment'
+                        : 'No matching equipment',
+                    message: query.isEmpty
+                        ? 'Add equipment to the catalog or update its available quantity.'
+                        : 'Try another search term.',
+                  );
+                }
 
-            return Column(
-              children: equipment.map((document) {
-                final data = document.data();
-                final name = data['name'] as String? ?? 'Unnamed equipment';
-                final category = data['category'] as String? ?? 'Other';
-                final description = data['description'] as String? ?? '';
-                final available = availability[document.id] ?? 0;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _InventoryCard(
-                    name: name,
-                    category: category,
-                    details: description.isEmpty
-                        ? (data['warehouseLocation'] as String? ?? '')
-                        : description,
-                    available: available,
-                    icon: _iconForCategory(category),
-                    color: _colorForCategory(category),
-                    quantity: selectedInventory[document.id] ?? 0,
-                    onQuantityChanged: (quantity) =>
-                        onQuantityChanged(document.id, quantity),
-                  ),
+                return Column(
+                  children: equipment.map((document) {
+                    final data = document.data();
+                    final name = data['name'] as String? ?? 'Unnamed equipment';
+                    final category = data['category'] as String? ?? 'Other';
+                    final description = data['description'] as String? ?? '';
+                    final available = availability[document.id] ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _InventoryCard(
+                        name: name,
+                        category: category,
+                        details: description.isEmpty
+                            ? (data['warehouseLocation'] as String? ?? '')
+                            : description,
+                        available: available,
+                        icon: _iconForCategory(category),
+                        color: _colorForCategory(category),
+                        quantity: selectedInventory[document.id] ?? 0,
+                        onQuantityChanged: (quantity) =>
+                            onQuantityChanged(document.id, quantity),
+                      ),
+                    );
+                  }).toList(),
                 );
-              }).toList(),
-            );
               },
             );
           },
@@ -632,18 +696,17 @@ class _InventoryReadyState extends StatelessWidget {
     IconData icon, {
     TextInputType? keyboardType,
     int maxLines = 1,
-  }) =>
-      TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon),
-          border: const OutlineInputBorder(),
-          isDense: true,
-        ),
-      );
+  }) => TextField(
+    controller: controller,
+    keyboardType: keyboardType,
+    maxLines: maxLines,
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      border: const OutlineInputBorder(),
+      isDense: true,
+    ),
+  );
 
   IconData _iconForCategory(String category) {
     final normalized = category.toLowerCase();
@@ -792,8 +855,11 @@ class _InventoryCard extends StatelessWidget {
               IconButton(
                 onPressed: available > 0 ? () => onQuantityChanged(1) : null,
                 tooltip: 'Add one to booking',
-                icon: Icon(Icons.add_circle_outline_rounded,
-                    color: Colors.grey.shade600, size: 28),
+                icon: Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: Colors.grey.shade600,
+                  size: 28,
+                ),
               )
             else
               Row(
@@ -804,8 +870,10 @@ class _InventoryCard extends StatelessWidget {
                     icon: const Icon(Icons.remove_circle_outline),
                     visualDensity: VisualDensity.compact,
                   ),
-                  Text('$quantity',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    '$quantity',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   IconButton(
                     onPressed: quantity < available
                         ? () => onQuantityChanged(quantity + 1)

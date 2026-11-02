@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +12,10 @@ import 'booking_calendar_page.dart';
 import 'operations_page.dart';
 import 'role_permissions.dart';
 
-const useEmulators = bool.fromEnvironment('USE_FIREBASE_EMULATORS', defaultValue: false);
+const useEmulators = bool.fromEnvironment(
+  'USE_FIREBASE_EMULATORS',
+  defaultValue: false,
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +24,6 @@ Future<void> main() async {
     const host = '127.0.0.1';
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-    FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
   }
   runApp(const VenueVaultApp());
 }
@@ -42,6 +43,27 @@ class VenueVaultApp extends StatelessWidget {
         ),
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xfff7f8fc),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xfff7f8fc),
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          titleTextStyle: TextStyle(
+            color: Color(0xff17153b),
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+            side: BorderSide(color: Color(0xffe9e9f2)),
+          ),
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -391,33 +413,126 @@ class HomePage extends StatelessWidget {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Good morning',
-                style: Theme.of(context).textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1180),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _WelcomeBanner(user: user),
+                  const SizedBox(height: 28),
+                  _OperationsDashboard(user: user),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Quick actions',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: const Color(0xff17153b),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Jump into the tools you use most.',
+                    style: TextStyle(color: Color(0xff667085), fontSize: 15),
+                  ),
+                  const SizedBox(height: 16),
+                  _HomeActions(user: user),
+                ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Here is today’s venue overview.',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 24),
-              _OperationsDashboard(user: user),
-              const SizedBox(height: 28),
-              Text(
-                'Quick actions',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              _HomeActions(user: user),
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _WelcomeBanner extends StatelessWidget {
+  const _WelcomeBanner({required this.user});
+
+  final User? user;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = user?.displayName?.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 24, 20, 24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xff312e81), Color(0xff4f46e5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x244f46e5),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name == null || name.isEmpty
+                      ? 'Good morning'
+                      : 'Good morning, $name',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Here is today’s venue overview.',
+                  style: TextStyle(color: Color(0xffdbeafe), fontSize: 15),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: const Text(
+                    'YOUR OPERATIONS WORKSPACE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .14),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.event_available_rounded,
+              color: Colors.white,
+              size: 36,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -430,6 +545,101 @@ class _OperationsDashboard extends StatefulWidget {
 
   @override
   State<_OperationsDashboard> createState() => _OperationsDashboardState();
+}
+
+DateTime? _dashboardDate(Object? value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is num) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt());
+  }
+  return null;
+}
+
+int _dashboardConflictCount(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> bookings,
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> equipment,
+) {
+  final capacity = <String, int>{
+    for (final document in equipment)
+      document.id:
+          (((document.data()['status'] as String?) ?? '')
+                  .toLowerCase()
+                  .contains('maintenance') ||
+              ['damaged', 'retired'].contains(
+                ((document.data()['status'] as String?) ?? '').toLowerCase(),
+              ))
+          ? 0
+          : (((document.data()['availableQuantity'] as num?)?.toInt() ?? 0) -
+                    ((document.data()['unavailableQuantity'] as num?)
+                            ?.toInt() ??
+                        0))
+                .clamp(
+                  0,
+                  (document.data()['totalQuantity'] as num?)?.toInt() ?? 0,
+                )
+                .toInt(),
+  };
+  final intervals = <String, List<_DashboardInterval>>{};
+  final conflicts = <String>{};
+
+  for (final booking in bookings) {
+    final data = booking.data();
+    if (data['status'] != 'confirmed') continue;
+    final start = _dashboardDate(data['startDate']);
+    final end = _dashboardDate(data['endDate']);
+    if (start == null || end == null || end.isBefore(start)) continue;
+    final items = (data['items'] as List?)?.whereType<Map>().toList() ?? [];
+    for (final item in items) {
+      final equipmentId = item['equipmentId']?.toString();
+      final quantity = (item['quantity'] as num?)?.toInt();
+      if (equipmentId == null || !capacity.containsKey(equipmentId)) {
+        conflicts.add(booking.id);
+      } else if (quantity != null && quantity > 0) {
+        intervals
+            .putIfAbsent(equipmentId, () => [])
+            .add(
+              _DashboardInterval(
+                bookingId: booking.id,
+                start: start,
+                end: end,
+                quantity: quantity,
+              ),
+            );
+      }
+    }
+  }
+
+  for (final entry in intervals.entries) {
+    final equipmentIntervals = entry.value;
+    for (final interval in equipmentIntervals) {
+      final overlapping = equipmentIntervals
+          .where(
+            (other) =>
+                !other.end.isBefore(interval.start) &&
+                !other.start.isAfter(interval.end),
+          )
+          .fold<int>(0, (total, other) => total + other.quantity);
+      if (overlapping > (capacity[entry.key] ?? 0)) {
+        conflicts.add(interval.bookingId);
+      }
+    }
+  }
+  return conflicts.length;
+}
+
+class _DashboardInterval {
+  const _DashboardInterval({
+    required this.bookingId,
+    required this.start,
+    required this.end,
+    required this.quantity,
+  });
+
+  final String bookingId;
+  final DateTime start;
+  final DateTime end;
+  final int quantity;
 }
 
 class _OperationsDashboardState extends State<_OperationsDashboard> {
@@ -451,12 +661,92 @@ class _OperationsDashboardState extends State<_OperationsDashboard> {
     final role = token.claims?['role'] as String?;
     if (!hasRolePermission(role, 'dashboard.view')) return null;
 
-    final result = await FirebaseFunctions.instance
-        .httpsCallable('getOperationsDashboard')
-        .call({
-          'timeZoneOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
-        });
-    return _OperationsDashboardData.from(result.data);
+    final db = FirebaseFirestore.instance;
+    final snapshots = await Future.wait([
+      db.collection('bookings').get(),
+      db.collection('equipment').get(),
+      db.collection('dispatches').get(),
+      db.collection('returns').get(),
+    ]);
+    final now = DateTime.now();
+    final limit = now.add(const Duration(days: 30));
+    final bookings = snapshots[0].docs;
+    final equipment = snapshots[1].docs;
+    final dispatches = snapshots[2].docs;
+    final returns = snapshots[3].docs;
+    final confirmed = bookings.where(
+      (doc) => doc.data()['status'] == 'confirmed',
+    );
+    final upcoming =
+        confirmed.where((doc) {
+          final start = _dashboardDate(doc.data()['startDate']);
+          return start != null && !start.isBefore(now) && start.isBefore(limit);
+        }).toList()..sort(
+          (a, b) =>
+              _dashboardDate(a.data()['startDate'])!
+                  .compareTo(_dashboardDate(b.data()['startDate'])!),
+        );
+    final overdue = confirmed.where((doc) {
+      final end = _dashboardDate(doc.data()['endDate']);
+      return end != null && end.isBefore(now);
+    }).toList();
+    final totalUnits = equipment.fold<int>(
+      0,
+      (total, doc) =>
+          total + ((doc.data()['totalQuantity'] as num?)?.toInt() ?? 0),
+    );
+    final availableUnits = equipment.fold<int>(
+      0,
+      (total, doc) =>
+          total +
+          (((doc.data()['availableQuantity'] as num?)?.toInt() ?? 0) -
+                  ((doc.data()['unavailableQuantity'] as num?)?.toInt() ?? 0))
+              .clamp(0, 1000000),
+    );
+    return _OperationsDashboardData.from({
+      'upcomingEventCount': upcoming.length,
+      'equipmentCount': equipment.length,
+      'totalUnits': totalUnits,
+      'availableUnits': availableUnits,
+      'unavailableUnits': (totalUnits - availableUnits).clamp(0, totalUnits),
+      'pendingDispatchCount': dispatches
+          .where(
+            (doc) => [
+              'pending',
+              'preparing',
+              'ready',
+            ].contains(doc.data()['status']),
+          )
+          .length,
+      'overdueReturnCount': overdue.length,
+      'conflictCount': _dashboardConflictCount(bookings, equipment),
+      'returnsPendingInspectionCount': returns
+          .where((doc) => doc.data()['status'] == 'pending_inspection')
+          .length,
+      'upcomingEvents': upcoming.take(10).map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'eventName': data['eventName'] ?? 'Event',
+          'venue': data['venue'] ?? '',
+          'startDateMillis': _dashboardDate(data['startDate'])!
+              .millisecondsSinceEpoch,
+          'endDateMillis':
+              _dashboardDate(data['endDate'])?.millisecondsSinceEpoch ??
+              _dashboardDate(data['startDate'])!.millisecondsSinceEpoch,
+        };
+      }).toList(),
+      'overdueReturns': overdue.take(10).map((doc) {
+        final data = doc.data();
+        return {
+          'bookingId': doc.id,
+          'eventName': data['eventName'] ?? 'Event',
+          'venue': data['venue'] ?? '',
+          'endDateMillis': _dashboardDate(data['endDate'])!
+              .millisecondsSinceEpoch,
+        };
+      }).toList(),
+    });
   }
 
   @override
@@ -485,8 +775,8 @@ class _OperationsDashboardState extends State<_OperationsDashboard> {
                     ),
                   ),
                 ],
-                    ),
-                  ),
+              ),
+            ),
           );
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -503,88 +793,97 @@ class _OperationsDashboardState extends State<_OperationsDashboard> {
           children: [
             Row(
               children: [
-                  Expanded(
+                Expanded(
                   child: Text(
                     'Operations dashboard',
                     style: Theme.of(context).textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                    ),
+                ),
                 IconButton(
                   tooltip: 'Refresh dashboard',
                   onPressed: () {
                     setState(() => _dashboard = _loadDashboard());
                   },
                   icon: const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
-            GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.45,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-                children: [
-                _SummaryCard(
-                  label: 'Upcoming events (30 days)',
-                  value: '${data.upcomingEventCount}',
-                  icon: Icons.calendar_month,
-                  color: Colors.indigo,
+                ),
+              ],
+            ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 900
+                    ? 4
+                    : constraints.maxWidth >= 560
+                    ? 3
+                    : 2;
+                return GridView.count(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: columns == 2 ? 1.35 : 1.45,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _SummaryCard(
+                      label: 'Upcoming events (30 days)',
+                      value: '${data.upcomingEventCount}',
+                      icon: Icons.calendar_month,
+                      color: Colors.indigo,
                     ),
-                _SummaryCard(
-                  label: 'Equipment records',
-                  value: '${data.equipmentCount}',
-                  icon: Icons.category_outlined,
-                  color: Colors.blueGrey,
-                  ),
-                _SummaryCard(
-                  label: 'Usable / total units',
-                  value: '${data.availableUnits} / ${data.totalUnits}',
+                    _SummaryCard(
+                      label: 'Equipment records',
+                      value: '${data.equipmentCount}',
+                      icon: Icons.category_outlined,
+                      color: Colors.blueGrey,
+                    ),
+                    _SummaryCard(
+                      label: 'Usable / total units',
+                      value: '${data.availableUnits} / ${data.totalUnits}',
                       icon: Icons.inventory_2_outlined,
-                  color: Colors.teal,
-                ),
-                _SummaryCard(
-                  label: 'Unavailable units',
-                  value: '${data.unavailableUnits}',
-                  icon: Icons.report_gmailerrorred_outlined,
-                  color: Colors.orange,
-                ),
-                _SummaryCard(
-                  label: 'Open dispatches',
-                  value: '${data.pendingDispatchCount}',
-                  icon: Icons.local_shipping_outlined,
-                  color: Colors.blue,
-                ),
-                _SummaryCard(
-                  label: 'Overdue returns',
-                  value: '${data.overdueReturnCount}',
-                  icon: Icons.assignment_return_outlined,
-                  color: Colors.deepOrange,
-                ),
-                _SummaryCard(
-                  label: 'Conflicting bookings',
-                  value: '${data.conflictCount}',
-                  icon: Icons.warning_amber_rounded,
+                      color: Colors.teal,
+                    ),
+                    _SummaryCard(
+                      label: 'Unavailable units',
+                      value: '${data.unavailableUnits}',
+                      icon: Icons.report_gmailerrorred_outlined,
+                      color: Colors.orange,
+                    ),
+                    _SummaryCard(
+                      label: 'Open dispatches',
+                      value: '${data.pendingDispatchCount}',
+                      icon: Icons.local_shipping_outlined,
+                      color: Colors.blue,
+                    ),
+                    _SummaryCard(
+                      label: 'Overdue returns',
+                      value: '${data.overdueReturnCount}',
+                      icon: Icons.assignment_return_outlined,
+                      color: Colors.deepOrange,
+                    ),
+                    _SummaryCard(
+                      label: 'Conflicting bookings',
+                      value: '${data.conflictCount}',
+                      icon: Icons.warning_amber_rounded,
                       color: Colors.redAccent,
                     ),
-                _SummaryCard(
-                  label: 'Returns awaiting inspection',
-                  value: '${data.returnsPendingInspectionCount}',
-                  icon: Icons.fact_check_outlined,
-                  color: Colors.purple,
-                  ),
-                ],
-              ),
+                    _SummaryCard(
+                      label: 'Returns awaiting inspection',
+                      value: '${data.returnsPendingInspectionCount}',
+                      icon: Icons.fact_check_outlined,
+                      color: Colors.purple,
+                    ),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 16),
             _DashboardEntryList(
               title: 'Upcoming events',
               emptyMessage: 'No confirmed events in the next 30 days.',
               entries: data.upcomingEvents,
               datePrefix: 'Starts',
-              ),
-              const SizedBox(height: 12),
+            ),
+            const SizedBox(height: 12),
             _DashboardEntryList(
               title: 'Overdue returns',
               emptyMessage: 'No overdue returns.',
@@ -651,7 +950,7 @@ class _HomeActionsState extends State<_HomeActions> {
             actions.add(const SizedBox(height: 10));
           }
           actions.add(
-              _ActionTile(
+            _ActionTile(
               icon: icon,
               title: title,
               subtitle: subtitle,
@@ -664,41 +963,41 @@ class _HomeActionsState extends State<_HomeActions> {
 
         addAction(
           permission: 'bookings.create',
-                icon: Icons.add_circle_outline,
-                title: 'Create booking',
-                subtitle: 'Reserve equipment for a new event',
-                      builder: (_) => const NewBookingPage(),
-                  );
+          icon: Icons.add_circle_outline,
+          title: 'Create booking',
+          subtitle: 'Reserve equipment for a new event',
+          builder: (_) => const NewBookingPage(),
+        );
         addAction(
           permission: 'inventory.view',
-                icon: Icons.inventory_2_outlined,
-                title: 'View inventory',
-                subtitle: 'Check availability and stock levels',
-                      builder: (_) => const EquipmentCatalogPage(),
-                  );
+          icon: Icons.inventory_2_outlined,
+          title: 'View inventory',
+          subtitle: 'Check availability and stock levels',
+          builder: (_) => const EquipmentCatalogPage(),
+        );
         addAction(
           permission: 'bookings.view',
-                icon: Icons.calendar_month_outlined,
-                title: 'Manage bookings',
+          icon: Icons.calendar_month_outlined,
+          title: 'Manage bookings',
           subtitle: 'View bookings and permitted booking actions',
-                      builder: (_) => const BookingManagementPage(),
-                  );
+          builder: (_) => const BookingManagementPage(),
+        );
         addAction(
           permission: 'bookings.view',
-                icon: Icons.date_range_outlined,
-                title: 'Booking calendar',
+          icon: Icons.date_range_outlined,
+          title: 'Booking calendar',
           subtitle: 'See reservations and event dates',
-                      builder: (_) => const BookingCalendarPage(),
-                  );
+          builder: (_) => const BookingCalendarPage(),
+        );
         if (hasRolePermission(role, 'bookings.view') &&
             hasRolePermission(role, 'inventory.view')) {
           addAction(
             permission: 'bookings.view',
-                icon: Icons.warning_amber_rounded,
+            icon: Icons.warning_amber_rounded,
             title: 'Conflict detection',
             subtitle: 'Review shortages, booking conflicts, and time windows',
-                      builder: (_) => const ConflictDetectionPage(),
-                  );
+            builder: (_) => const ConflictDetectionPage(),
+          );
         }
         if (hasRolePermission(role, 'dispatch.viewAll') ||
             hasRolePermission(role, 'dispatch.viewAssigned') ||
@@ -708,10 +1007,10 @@ class _HomeActionsState extends State<_HomeActions> {
             permission: hasRolePermission(role, 'dispatch.viewAll')
                 ? 'dispatch.viewAll'
                 : 'dispatch.viewAssigned',
-                icon: Icons.local_shipping_outlined,
-                title: 'Operations',
+            icon: Icons.local_shipping_outlined,
+            title: 'Operations',
             subtitle: 'Open dispatch, checklist, and return tasks',
-                      builder: (_) => const OperationsPage(),
+            builder: (_) => const OperationsPage(),
           );
         }
 
@@ -724,8 +1023,8 @@ class _HomeActionsState extends State<_HomeActions> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: actions,
-                  );
-                },
+        );
+      },
     );
   }
 }
@@ -819,7 +1118,7 @@ class _OperationsDashboardData {
         'overdueReturns',
         'bookingId',
         'endDateMillis',
-              ),
+      ),
     );
   }
 }
@@ -879,7 +1178,7 @@ class _DashboardEntryList extends StatelessWidget {
                   title: Text(entry.eventName),
                   subtitle: Text(
                     '${entry.venue}\n$datePrefix ${entry.dateLabel}',
-          ),
+                  ),
                   isThreeLine: true,
                 ),
               ),
@@ -906,20 +1205,40 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(15),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 14),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const Spacer(),
             Text(
               value,
-              style: Theme.of(context).textTheme.headlineMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: const Color(0xff17153b),
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 4),
-            Text(label),
+            Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xff667085),
+                fontSize: 12,
+                height: 1.2,
+              ),
+            ),
           ],
         ),
       ),
@@ -943,13 +1262,55 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: CircleAvatar(child: Icon(icon)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xffeef2ff),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Icon(icon, color: const Color(0xff4f46e5), size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Color(0xff17153b),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xff667085),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(
+                Icons.arrow_forward_rounded,
+                size: 20,
+                color: Color(0xff98a2b3),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

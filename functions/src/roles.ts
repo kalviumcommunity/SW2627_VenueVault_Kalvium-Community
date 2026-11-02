@@ -68,6 +68,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   operations_manager: [
     "inventory.view",
     "bookings.view",
+    "bookings.create",
+    "bookings.edit",
     "conflicts.resolve",
     "approvals.decide",
     "dispatch.viewAll",

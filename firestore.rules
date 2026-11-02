@@ -45,8 +45,9 @@ service cloud.firestore {
           role in ['booking_staff', 'warehouse_staff', 'operations_manager']) ||
         (permission == 'bookings.view' &&
           role in ['booking_staff', 'warehouse_staff', 'operations_manager']) ||
-        (permission in ['bookings.create', 'bookings.edit', 'bookings.cancel'] &&
-          role == 'booking_staff') ||
+        (permission in ['bookings.create', 'bookings.edit'] &&
+          role in ['booking_staff', 'operations_manager']) ||
+        (permission == 'bookings.cancel' && role == 'booking_staff') ||
         (permission == 'conflicts.resolve' && role == 'operations_manager') ||
         (permission == 'approvals.decide' && role == 'operations_manager') ||
         (permission == 'dispatch.viewAll' &&
@@ -66,32 +67,154 @@ service cloud.firestore {
         (permission == 'audit.view' && role == 'operations_manager');
     }
 
+    function validBooking(data) {
+      return data.keys().hasOnly([
+          'customerName', 'customerPhone', 'eventName', 'venue', 'staffName',
+          'notes', 'startDate', 'endDate', 'items', 'status', 'createdBy',
+          'createdAt', 'updatedBy', 'updatedAt', 'cancelledAt', 'returnedAt'
+        ]) &&
+        data.customerName is string && data.customerName.size() > 0 &&
+        data.customerName.size() <= 120 &&
+        data.customerPhone is string && data.customerPhone.size() <= 40 &&
+        data.eventName is string && data.eventName.size() > 0 &&
+        data.eventName.size() <= 120 &&
+        data.venue is string && data.venue.size() > 0 &&
+        data.venue.size() <= 200 &&
+        data.staffName is string && data.staffName.size() > 0 &&
+        data.staffName.size() <= 120 &&
+        data.notes is string && data.notes.size() <= 1000 &&
+        data.startDate is timestamp && data.endDate is timestamp &&
+        data.endDate >= data.startDate &&
+        data.items is list && data.items.size() > 0 && data.items.size() <= 50 &&
+        data.status in ['confirmed', 'cancelled', 'returned'] &&
+        data.createdBy is string && data.createdBy.size() <= 128 &&
+        data.createdAt is timestamp &&
+        data.updatedBy is string && data.updatedBy.size() <= 128 &&
+        data.updatedAt is timestamp &&
+        (!('cancelledAt' in data) || data.cancelledAt is timestamp) &&
+        (!('returnedAt' in data) || data.returnedAt is timestamp);
+    }
+
+    function validEquipment(data) {
+      return data.keys().hasOnly([
+          'name', 'category', 'totalQuantity', 'availableQuantity',
+          'unavailableQuantity', 'condition', 'status', 'warehouseLocation',
+          'rentalPrice', 'description', 'maintenanceNotes', 'updatedAt'
+        ]) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 120 &&
+        data.category is string && data.category.size() > 0 && data.category.size() <= 80 &&
+        data.totalQuantity is number && data.totalQuantity >= 0 &&
+        data.availableQuantity is number && data.availableQuantity >= 0 &&
+        data.unavailableQuantity is number && data.unavailableQuantity >= 0 &&
+        data.condition is string && data.condition.size() <= 30 &&
+        data.status is string && data.status.size() <= 30 &&
+        data.warehouseLocation is string && data.warehouseLocation.size() <= 120 &&
+        data.rentalPrice is number && data.rentalPrice >= 0 &&
+        data.description is string && data.description.size() <= 1000 &&
+        data.maintenanceNotes is string && data.maintenanceNotes.size() <= 1000 &&
+        data.updatedAt is timestamp;
+    }
+
+    function validReturn(data) {
+      return data.keys().hasOnly([
+          'bookingId', 'eventName', 'items', 'status', 'recordedBy',
+          'recordedAt', 'approvedBy', 'approvedAt'
+        ]) &&
+        data.bookingId is string && data.bookingId.size() > 0 &&
+        data.eventName is string && data.eventName.size() > 0 &&
+        data.eventName.size() <= 120 &&
+        data.items is list && data.items.size() > 0 && data.items.size() <= 100 &&
+        data.status in ['pending_inspection', 'approved'] &&
+        data.recordedBy is string && data.recordedBy.size() <= 128 &&
+        data.recordedAt is timestamp &&
+        (!('approvedBy' in data) || data.approvedBy == null ||
+          (data.approvedBy is string && data.approvedBy.size() <= 128)) &&
+        (!('approvedAt' in data) || data.approvedAt == null ||
+          data.approvedAt is timestamp);
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list, create, update, delete: if false;
     }
 
     match /equipment/{equipmentId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow read: if hasPermission('inventory.view');
+      allow create: if hasPermission('equipment.manage') &&
+        validEquipment(request.resource.data);
+      allow update: if (hasPermission('equipment.manage') &&
+          validEquipment(request.resource.data)) ||
+        (hasPermission('returns.approve') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'unavailableQuantity', 'updatedAt'
+          ])) ||
+        (hasPermission('stock.update') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'availableQuantity', 'unavailableQuantity', 'condition', 'status',
+            'maintenanceNotes', 'updatedAt'
+          ]));
+      allow delete: if false;
     }
 
     match /bookings/{bookingId} {
       allow read: if hasPermission('bookings.view');
-      allow create, update, delete: if false;
+      allow create: if hasPermission('bookings.create') &&
+        validBooking(request.resource.data) &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.updatedBy == request.auth.uid;
+      allow update: if validBooking(request.resource.data) &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        (
+          (hasPermission('bookings.edit') &&
+            request.resource.data.status == resource.data.status) ||
+          (hasPermission('bookings.cancel') &&
+            resource.data.status == 'confirmed' &&
+            request.resource.data.status == 'cancelled') ||
+          (hasPermission('returns.approve') &&
+            resource.data.status == 'confirmed' &&
+            request.resource.data.status == 'returned')
+        );
+      allow delete: if false;
     }
 
     match /dispatches/{dispatchId} {
       allow get, list: if hasPermission('dispatch.viewAll') ||
         (hasPermission('dispatch.viewAssigned') &&
           resource.data.assignedStaffUid == request.auth.uid);
-      allow create, update, delete: if false;
+      allow create: if false;
+      allow update: if hasPermission('dispatch.assign') ||
+        hasPermission('checklist.manage') ||
+        (hasPermission('dispatch.updateStatus') &&
+          resource.data.assignedStaffUid == request.auth.uid);
+      allow delete: if false;
     }
 
     match /returns/{returnId} {
       allow read: if hasPermission('returns.record') ||
         hasPermission('returns.approve');
-      allow create, update, delete: if false;
+      allow create: if hasPermission('returns.record') &&
+        validReturn(request.resource.data) &&
+        request.resource.data.status == 'pending_inspection' &&
+        request.resource.data.recordedBy == request.auth.uid &&
+        request.resource.data.recordedAt is timestamp;
+      allow update: if hasPermission('returns.approve') &&
+          validReturn(request.resource.data) &&
+          resource.data.status == 'pending_inspection' &&
+          request.resource.data.status == 'approved' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'approvedBy', 'approvedAt'
+          ]) &&
+          request.resource.data.approvedBy == request.auth.uid &&
+          request.resource.data.approvedAt is timestamp ||
+        hasPermission('maintenance.manage') &&
+          validReturn(request.resource.data) &&
+          resource.data.status == 'approved' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'items'
+          ]);
+      allow delete: if false;
     }
 
     match /auditLogs/{auditId} {

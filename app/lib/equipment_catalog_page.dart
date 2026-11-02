@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -197,18 +196,11 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Equipment retired.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Equipment retired.')));
     } on FirebaseException catch (error) {
       _showError(error);
     }
-  }
-
-  void _showErrorMessage(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showError(FirebaseException error) {
@@ -246,107 +238,116 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
         final canManageCatalog = access == _EquipmentAccess.catalogManage;
         final canUpdateStock = access == _EquipmentAccess.stockUpdate;
         return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Equipment catalog',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        actions: [
-          if (canManageCatalog)
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: FilledButton.icon(
-              onPressed: () => _openEditor(),
-              icon: const Icon(Icons.add),
-              label: const Text('Add equipment'),
+          appBar: AppBar(
+            title: const Text(
+              'Equipment catalog',
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
+            actions: [
+              if (canManageCatalog)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: FilledButton.icon(
+                    onPressed: () => _openEditor(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add equipment'),
+                  ),
+                ),
+            ],
           ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _items.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _CatalogMessage(
-              icon: Icons.cloud_off_outlined,
-              title: 'Could not load equipment',
-              subtitle:
-                  snapshot.error is FirebaseException &&
-                      (snapshot.error as FirebaseException).code ==
-                          'permission-denied'
-                  ? 'Firestore access was denied. Check the project’s Firestore security rules.'
-                  : 'Check that Firestore is enabled for the connected Firebase project, then try again.',
-            );
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final allItems =
-              (snapshot.data?.docs ?? [])
-                  .map(EquipmentItem.fromDocument)
-                  .toList()
-                ..sort(
-                  (a, b) =>
-                      a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _items.snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return _CatalogMessage(
+                  icon: Icons.cloud_off_outlined,
+                  title: 'Could not load equipment',
+                  subtitle:
+                      snapshot.error is FirebaseException &&
+                          (snapshot.error as FirebaseException).code ==
+                              'permission-denied'
+                      ? 'Firestore access was denied. Check the project’s Firestore security rules.'
+                      : 'Check that Firestore is enabled for the connected Firebase project, then try again.',
                 );
-          final items = allItems.where(_matchesFilters).toList();
-          return Column(
-            children: [
-              _overview(allItems),
-              _filters(),
-              Expanded(
-                child: items.isEmpty
-                    ? _CatalogMessage(
-                        icon: allItems.isEmpty
-                            ? Icons.inventory_2_outlined
-                            : Icons.search_off,
-                        title: allItems.isEmpty
-                            ? 'Your catalog is empty'
-                            : 'No matching equipment',
-                        subtitle: allItems.isEmpty
-                            ? canManageCatalog
-                                  ? 'Add equipment to start tracking inventory and rental details.'
-                                  : 'Ask an admin to add items to the catalog.'
-                            : 'Try changing the search or filters.',
-                        action: allItems.isEmpty && canManageCatalog
-                            ? FilledButton.icon(
-                                onPressed: () => _openEditor(),
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add first item'),
-                              )
-                            : null,
-                      )
-                    : LayoutBuilder(
-                        builder: (context, constraints) => ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                          itemCount: items.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) => _EquipmentTile(
-                            item: items[index],
-                            compact: constraints.maxWidth < 650,
-                            onEdit: canManageCatalog
-                                ? () => _openEditor(item: items[index])
-                                : null,
-                            onUpdateStock: canUpdateStock
-                                ? () => _openEditor(
-                                    item: items[index],
-                                    stockOnly: true,
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final allItems =
+                  (snapshot.data?.docs ?? [])
+                      .map(EquipmentItem.fromDocument)
+                      .toList()
+                    ..sort(
+                      (a, b) =>
+                          a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                    );
+              final items = allItems.where(_matchesFilters).toList();
+              return Column(
+                children: [
+                  _overview(allItems),
+                  _filters(),
+                  Expanded(
+                    child: items.isEmpty
+                        ? _CatalogMessage(
+                            icon: allItems.isEmpty
+                                ? Icons.inventory_2_outlined
+                                : Icons.search_off,
+                            title: allItems.isEmpty
+                                ? 'Your catalog is empty'
+                                : 'No matching equipment',
+                            subtitle: allItems.isEmpty
+                                ? canManageCatalog
+                                      ? 'Add equipment to start tracking inventory and rental details.'
+                                      : 'Ask an admin to add items to the catalog.'
+                                : 'Try changing the search or filters.',
+                            action: allItems.isEmpty && canManageCatalog
+                                ? FilledButton.icon(
+                                    onPressed: () => _openEditor(),
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Add first item'),
                                   )
                                 : null,
-                            onRetire: canManageCatalog
-                                ? () => _retire(items[index])
-                                : null,
+                          )
+                        : LayoutBuilder(
+                            builder: (context, constraints) =>
+                                ListView.separated(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    0,
+                                    20,
+                                    24,
+                                  ),
+                                  itemCount: items.length,
+                                  separatorBuilder: (_, _) =>
+                                      const SizedBox(height: 10),
+                                  itemBuilder: (context, index) =>
+                                      _EquipmentTile(
+                                        item: items[index],
+                                        compact: constraints.maxWidth < 650,
+                                        onEdit: canManageCatalog
+                                            ? () => _openEditor(
+                                                item: items[index],
+                                              )
+                                            : null,
+                                        onUpdateStock: canUpdateStock
+                                            ? () => _openEditor(
+                                                item: items[index],
+                                                stockOnly: true,
+                                              )
+                                            : null,
+                                        onRetire: canManageCatalog
+                                            ? () => _retire(items[index])
+                                            : null,
+                                      ),
+                                ),
                           ),
-                        ),
-                      ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
+                  ),
+                ],
+              );
+            },
+          ),
+        );
       },
     );
   }
@@ -413,11 +414,15 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
           return wide
               ? Row(
                   children: cards
+                      .asMap()
+                      .entries
                       .map(
-                        (card) => Expanded(
+                        (entry) => Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: card,
+                            padding: EdgeInsets.only(
+                              right: entry.key == cards.length - 1 ? 0 : 10,
+                            ),
+                            child: entry.value,
                           ),
                         ),
                       )
@@ -429,7 +434,10 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
                   children: cards
                       .map(
                         (card) => SizedBox(
-                          width: (constraints.maxWidth - 10) / 2,
+                          width:
+                              ((constraints.maxWidth - 10) / 2)
+                                  .floorToDouble() -
+                              0.5,
                           child: card,
                         ),
                       )
@@ -455,6 +463,7 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
             ),
           );
           final category = DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _categoryFilter,
             decoration: const InputDecoration(
               isDense: true,
@@ -472,6 +481,7 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
                 setState(() => _categoryFilter = value ?? 'All categories'),
           );
           final status = DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _statusFilter,
             decoration: const InputDecoration(
               isDense: true,
@@ -479,7 +489,10 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
             ),
             items: ['All statuses', ..._statuses]
                 .map(
-                  (value) => DropdownMenuItem(value: value, child: Text(value)),
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text(value, overflow: TextOverflow.ellipsis),
+                  ),
                 )
                 .toList(),
             onChanged: (value) =>
@@ -530,6 +543,7 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     elevation: 0,
+    margin: EdgeInsets.zero,
     color: Colors.white,
     child: Padding(
       padding: const EdgeInsets.all(16),
@@ -675,43 +689,43 @@ class _EquipmentTile extends StatelessWidget {
               ),
             ),
             if (onEdit != null || onUpdateStock != null || onRetire != null)
-            PopupMenuButton<String>(
-              tooltip: 'Equipment actions',
-              onSelected: (value) {
-                if (value == 'edit') onEdit?.call();
-                if (value == 'stock') onUpdateStock?.call();
-                if (value == 'retire') onRetire?.call();
-              },
-              itemBuilder: (_) => [
-                if (onEdit != null)
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Edit'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                if (onUpdateStock != null)
-                  const PopupMenuItem(
-                    value: 'stock',
-                    child: ListTile(
-                      leading: Icon(Icons.inventory_outlined),
-                      title: Text('Update stock'),
-                      contentPadding: EdgeInsets.zero,
+              PopupMenuButton<String>(
+                tooltip: 'Equipment actions',
+                onSelected: (value) {
+                  if (value == 'edit') onEdit?.call();
+                  if (value == 'stock') onUpdateStock?.call();
+                  if (value == 'retire') onRetire?.call();
+                },
+                itemBuilder: (_) => [
+                  if (onEdit != null)
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        leading: Icon(Icons.edit_outlined),
+                        title: Text('Edit'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                if (onRetire != null && item.status != 'Retired')
-                  const PopupMenuItem(
-                    value: 'retire',
-                    child: ListTile(
-                      leading: Icon(Icons.inventory_2_outlined),
-                      title: Text('Retire'),
-                      contentPadding: EdgeInsets.zero,
+                  if (onUpdateStock != null)
+                    const PopupMenuItem(
+                      value: 'stock',
+                      child: ListTile(
+                        leading: Icon(Icons.inventory_outlined),
+                        title: Text('Update stock'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-              ],
-            ),
+                  if (onRetire != null && item.status != 'Retired')
+                    const PopupMenuItem(
+                      value: 'retire',
+                      child: ListTile(
+                        leading: Icon(Icons.inventory_2_outlined),
+                        title: Text('Retire'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                ],
+              ),
           ],
         ),
       ),
@@ -942,6 +956,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _categories.contains(_category)
                       ? _category
                       : 'Other',
@@ -997,6 +1012,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: _condition,
                         decoration: const InputDecoration(
                           labelText: 'Condition',
@@ -1016,6 +1032,7 @@ class _EquipmentEditorState extends State<_EquipmentEditor> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: _status,
                         decoration: const InputDecoration(labelText: 'Status'),
                         items: _statuses
