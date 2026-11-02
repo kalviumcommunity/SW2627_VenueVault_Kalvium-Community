@@ -90,7 +90,11 @@ class _NewBookingPageState extends State<NewBookingPage> {
 
   Future<void> _saveBooking() async {
     if (_selectedDates == null || _selectedInventory.isEmpty) {
-      _message('Select event dates and at least one equipment item.');
+      _message('Select event dates, times, and at least one equipment item.');
+      return;
+    }
+    if (!_selectedDates!.start.isBefore(_selectedDates!.end)) {
+      _message('The event end time must be after the start time.');
       return;
     }
     if (_customerController.text.trim().isEmpty ||
@@ -164,8 +168,8 @@ class _NewBookingPageState extends State<NewBookingPage> {
         'venue': _venueController.text.trim(),
         'staffName': _staffController.text.trim(),
         'notes': _notesController.text.trim(),
-        'startDate': Timestamp.fromDate(_dateOnly(_selectedDates!.start)),
-        'endDate': Timestamp.fromDate(_dateOnly(_selectedDates!.end)),
+        'startDate': Timestamp.fromDate(_selectedDates!.start),
+        'endDate': Timestamp.fromDate(_selectedDates!.end),
         'items': items,
       };
       final requestId = db.collection('bookings').doc().id;
@@ -231,14 +235,49 @@ class _NewBookingPageState extends State<NewBookingPage> {
       context: context,
       firstDate: firstDate,
       lastDate: DateTime(now.year + 2, 12, 31),
-      initialDateRange: _selectedDates,
+      initialDateRange: _selectedDates == null
+          ? null
+          : DateTimeRange(
+              start: _dateOnly(_selectedDates!.start),
+              end: _dateOnly(_selectedDates!.end),
+            ),
       helpText: 'Select event dates',
       saveText: 'Done',
     );
 
     if (selectedDates != null && mounted) {
-      setState(() => _selectedDates = selectedDates);
+      final startTime = _selectedDates?.start ?? DateTime(0, 1, 1, 9);
+      final endTime = _selectedDates?.end ?? DateTime(0, 1, 1, 17);
+      setState(
+        () => _selectedDates = DateTimeRange(
+          start: _atTime(selectedDates.start, startTime),
+          end: _atTime(selectedDates.end, endTime),
+        ),
+      );
     }
+  }
+
+  Future<void> _selectTime({required bool start}) async {
+    if (_selectedDates == null) {
+      _message('Select event dates first.');
+      return;
+    }
+    final current = start ? _selectedDates!.start : _selectedDates!.end;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+      helpText: start ? 'Select start time' : 'Select end time',
+    );
+    if (picked == null || !mounted) return;
+    final updated = _atTime(
+      start ? _selectedDates!.start : _selectedDates!.end,
+      DateTime(0, 1, 1, picked.hour, picked.minute),
+    );
+    setState(() {
+      _selectedDates = start
+          ? DateTimeRange(start: updated, end: _selectedDates!.end)
+          : DateTimeRange(start: _selectedDates!.start, end: updated);
+    });
   }
 
   @override
@@ -265,6 +304,8 @@ class _NewBookingPageState extends State<NewBookingPage> {
           _DateSelectionPanel(
             selectedDates: _selectedDates,
             onSelectDates: _selectDates,
+            onSelectStartTime: () => _selectTime(start: true),
+            onSelectEndTime: () => _selectTime(start: false),
           ),
           Expanded(
             child: _selectedDates == null
@@ -326,10 +367,14 @@ class _DateSelectionPanel extends StatelessWidget {
   const _DateSelectionPanel({
     required this.selectedDates,
     required this.onSelectDates,
+    required this.onSelectStartTime,
+    required this.onSelectEndTime,
   });
 
   final DateTimeRange? selectedDates;
   final VoidCallback onSelectDates;
+  final VoidCallback onSelectStartTime;
+  final VoidCallback onSelectEndTime;
 
   @override
   Widget build(BuildContext context) {
@@ -370,7 +415,7 @@ class _DateSelectionPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Select Event Dates First',
+                      'Select event dates and times',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         color: Colors.indigo,
                         fontWeight: FontWeight.bold,
@@ -378,8 +423,8 @@ class _DateSelectionPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Dates must be selected to calculate accurate inventory '
-                      'and prevent double-booking.',
+                      'The time window is used to distinguish morning and '
+                      'evening bookings on the same day.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -411,6 +456,28 @@ class _DateSelectionPanel extends StatelessWidget {
               ),
             ),
           ),
+          if (selectedDates != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onSelectStartTime,
+                    icon: const Icon(Icons.login_outlined, size: 18),
+                    label: Text('Start ${_formatTime(selectedDates!.start)}'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onSelectEndTime,
+                    icon: const Icon(Icons.logout_outlined, size: 18),
+                    label: Text('End ${_formatTime(selectedDates!.end)}'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -895,7 +962,20 @@ String _formatDate(DateTime date) {
       '${date.month.toString().padLeft(2, '0')}/${date.year}';
 }
 
+String _formatTime(DateTime time) {
+  final hour = time.hour == 0
+      ? 12
+      : time.hour > 12
+      ? time.hour - 12
+      : time.hour;
+  final suffix = time.hour >= 12 ? 'PM' : 'AM';
+  return '$hour:${time.minute.toString().padLeft(2, '0')} $suffix';
+}
+
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
+DateTime _atTime(DateTime date, DateTime time) =>
+    DateTime(date.year, date.month, date.day, time.hour, time.minute);
 
 DateTime? _asDate(Object? value) {
   if (value is Timestamp) return value.toDate();

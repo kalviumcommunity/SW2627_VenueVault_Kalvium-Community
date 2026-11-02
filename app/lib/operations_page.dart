@@ -10,7 +10,7 @@ class OperationsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<IdTokenResult>(
-      future: FirebaseAuth.instance.currentUser!.getIdTokenResult(true),
+      future: FirebaseAuth.instance.currentUser!.getIdTokenResult(false),
       builder: (context, tokenSnapshot) {
         if (tokenSnapshot.hasError) {
           return const Scaffold(
@@ -86,7 +86,7 @@ class _DispatchList extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return FutureBuilder<IdTokenResult>(
-      future: FirebaseAuth.instance.currentUser!.getIdTokenResult(true),
+      future: FirebaseAuth.instance.currentUser!.getIdTokenResult(false),
       builder: (context, tokenSnapshot) {
         if (tokenSnapshot.hasError) {
           return const Center(
@@ -497,7 +497,12 @@ Future<void> _showRecordReturn(
   final submit = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: Text('Inspect ${booking['eventName'] ?? 'return'}'),
+      title: Text('Confirm return: ${booking['eventName'] ?? 'return'}'),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      semanticLabel: 'Confirm that the equipment has been returned',
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      scrollable: true,
       content: SizedBox(
         width: 480,
         child: ListView(
@@ -535,7 +540,7 @@ Future<void> _showRecordReturn(
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Record for inspection'),
+          child: const Text('Confirm items returned'),
         ),
       ],
     ),
@@ -607,6 +612,8 @@ Future<void> _showRecordReturn(
           'status': 'pending_inspection',
           'recordedBy': FirebaseAuth.instance.currentUser!.uid,
           'recordedAt': FieldValue.serverTimestamp(),
+          'returnConfirmedBy': FirebaseAuth.instance.currentUser!.uid,
+          'returnConfirmedAt': FieldValue.serverTimestamp(),
           'approvedBy': null,
           'approvedAt': null,
         });

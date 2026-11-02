@@ -193,10 +193,22 @@ class _ConflictEngine {
           }
         }
 
-        if (totalReserved >= usable) {
-          // Only add if this booking is the one contributing to the overflow.
+        if (totalReserved > usable) {
+          // Show one shortage for an equipment/date window, even when several
+          // overlapping bookings contribute to the same over-allocation.
+          final windowKey = [
+            eqId,
+            start.millisecondsSinceEpoch,
+            end.millisecondsSinceEpoch,
+          ].join(':');
           final alreadyAdded = shortages.any(
-            (s) => s.equipmentId == eqId && s.bookingId == booking.id,
+            (s) =>
+                [
+                  s.equipmentId,
+                  s.start.millisecondsSinceEpoch,
+                  s.end.millisecondsSinceEpoch,
+                ].join(':') ==
+                windowKey,
           );
           if (!alreadyAdded) {
             shortages.add(
@@ -428,11 +440,7 @@ class _ConflictEngine {
     DateTime bStart,
     DateTime bEnd,
   ) {
-    final as_ = _dateOnly(aStart);
-    final ae = _dateOnly(aEnd);
-    final bs = _dateOnly(bStart);
-    final be = _dateOnly(bEnd);
-    return !as_.isAfter(be) && !ae.isBefore(bs);
+    return !aStart.isAfter(bEnd) && !aEnd.isBefore(bStart);
   }
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -477,7 +485,7 @@ class ConflictDetectionPage extends StatelessWidget {
       );
     }
     return FutureBuilder<IdTokenResult>(
-      future: user.getIdTokenResult(true),
+      future: user.getIdTokenResult(false),
       builder: (context, tokenSnapshot) {
         if (tokenSnapshot.hasError) {
           return const Scaffold(
@@ -1338,5 +1346,7 @@ Widget _row(IconData icon, String text) => Row(
 String _fmt(DateTime? d) {
   if (d == null) return '—';
   return '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year}';
+      '${d.month.toString().padLeft(2, '0')}/${d.year} '
+      '${d.hour.toString().padLeft(2, '0')}:'
+      '${d.minute.toString().padLeft(2, '0')}';
 }
