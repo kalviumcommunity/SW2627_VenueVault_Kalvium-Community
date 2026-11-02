@@ -97,7 +97,11 @@ class _UnavailableWindow {
 }
 
 class _Interval {
-  _Interval({required this.start, required this.end, required this.bookingName});
+  _Interval({
+    required this.start,
+    required this.end,
+    required this.bookingName,
+  });
   final DateTime start;
   final DateTime end;
   final String bookingName;
@@ -161,7 +165,8 @@ class _ConflictEngine {
         final eqData = equipmentMap[eqId];
         if (eqData == null) continue;
 
-        final baseAvailable = (eqData['availableQuantity'] as num?)?.toInt() ??
+        final baseAvailable =
+            (eqData['availableQuantity'] as num?)?.toInt() ??
             (eqData['totalQuantity'] as num?)?.toInt() ??
             0;
         final unavailable =
@@ -190,24 +195,26 @@ class _ConflictEngine {
 
         if (totalReserved >= usable) {
           // Only add if this booking is the one contributing to the overflow.
-          final alreadyAdded = shortages.any((s) =>
-              s.equipmentId == eqId &&
-              s.bookingId == booking.id);
+          final alreadyAdded = shortages.any(
+            (s) => s.equipmentId == eqId && s.bookingId == booking.id,
+          );
           if (!alreadyAdded) {
-            shortages.add(_Shortage(
-              equipmentId: eqId,
-              equipmentName:
-                  (raw['name'] ?? eqData['name'] ?? eqId).toString(),
-              category: (eqData['category'] as String? ?? 'Other'),
-              totalAvailable: usable,
-              totalReserved: totalReserved,
-              bookingEventName:
-                  (data['eventName'] as String? ?? 'Unknown event'),
-              bookingId: booking.id,
-              start: start,
-              end: end,
-              requested: requested,
-            ));
+            shortages.add(
+              _Shortage(
+                equipmentId: eqId,
+                equipmentName: (raw['name'] ?? eqData['name'] ?? eqId)
+                    .toString(),
+                category: (eqData['category'] as String? ?? 'Other'),
+                totalAvailable: usable,
+                totalReserved: totalReserved,
+                bookingEventName:
+                    (data['eventName'] as String? ?? 'Unknown event'),
+                bookingId: booking.id,
+                start: start,
+                end: end,
+                requested: requested,
+              ),
+            );
           }
         }
       }
@@ -227,7 +234,8 @@ class _ConflictEngine {
     };
     final equipmentAvail = {
       for (final e in equipment)
-        e.id: ((e.data()['availableQuantity'] as num?)?.toInt() ??
+        e.id:
+            ((e.data()['availableQuantity'] as num?)?.toInt() ??
             (e.data()['totalQuantity'] as num?)?.toInt() ??
             0),
     };
@@ -263,12 +271,14 @@ class _ConflictEngine {
           final reservedByB = bItems[eqId]!;
           final available = equipmentAvail[eqId] ?? 0;
           if (reservedByA + reservedByB > available) {
-            sharedList.add(_SharedItem(
-              name: equipmentMap[eqId] ?? eqId,
-              reservedByA: reservedByA,
-              reservedByB: reservedByB,
-              available: available,
-            ));
+            sharedList.add(
+              _SharedItem(
+                name: equipmentMap[eqId] ?? eqId,
+                reservedByA: reservedByA,
+                reservedByB: reservedByB,
+                available: available,
+              ),
+            );
           }
         }
 
@@ -280,17 +290,19 @@ class _ConflictEngine {
         if (seen.contains(key)) continue;
         seen.add(key);
 
-        conflicts.add(_BookingConflict(
-          bookingAId: aDoc.id,
-          bookingAName: aData['eventName'] as String? ?? 'Event A',
-          bookingAStart: aStart,
-          bookingAEnd: aEnd,
-          bookingBId: bDoc.id,
-          bookingBName: bData['eventName'] as String? ?? 'Event B',
-          bookingBStart: bStart,
-          bookingBEnd: bEnd,
-          sharedEquipment: sharedList,
-        ));
+        conflicts.add(
+          _BookingConflict(
+            bookingAId: aDoc.id,
+            bookingAName: aData['eventName'] as String? ?? 'Event A',
+            bookingAStart: aStart,
+            bookingAEnd: aEnd,
+            bookingBId: bDoc.id,
+            bookingBName: bData['eventName'] as String? ?? 'Event B',
+            bookingBStart: bStart,
+            bookingBEnd: bEnd,
+            sharedEquipment: sharedList,
+          ),
+        );
       }
     }
     return conflicts;
@@ -306,13 +318,17 @@ class _ConflictEngine {
 
     for (final eqDoc in equipment) {
       final eqData = eqDoc.data();
-      final statusStr =
-          (eqData['status'] as String? ?? 'Available').toLowerCase();
-      if (const {'retired', 'damaged', 'under maintenance'}
-          .contains(statusStr)) {
+      final statusStr = (eqData['status'] as String? ?? 'Available')
+          .toLowerCase();
+      if (const {
+        'retired',
+        'damaged',
+        'under maintenance',
+      }.contains(statusStr)) {
         continue;
       }
-      final usable = (eqData['availableQuantity'] as num?)?.toInt() ??
+      final usable =
+          (eqData['availableQuantity'] as num?)?.toInt() ??
           (eqData['totalQuantity'] as num?)?.toInt() ??
           0;
       if (usable == 0) continue;
@@ -332,11 +348,13 @@ class _ConflictEngine {
           if (id != eqDoc.id) continue;
           final qty = (item['quantity'] as num?)?.toInt() ?? 0;
           if (qty >= usable) {
-            intervals.add(_Interval(
-              start: bStart,
-              end: bEnd,
-              bookingName: bData['eventName'] as String? ?? 'Booking',
-            ));
+            intervals.add(
+              _Interval(
+                start: bStart,
+                end: bEnd,
+                bookingName: bData['eventName'] as String? ?? 'Booking',
+              ),
+            );
           }
         }
       }
@@ -349,14 +367,16 @@ class _ConflictEngine {
       // Find 2-week windows before, between and after busy blocks.
       final alternatives = _suggestAlternatives(intervals);
 
-      result.add(_UnavailableWindow(
-        equipmentId: eqDoc.id,
-        equipmentName: eqData['name'] as String? ?? eqDoc.id,
-        category: eqData['category'] as String? ?? 'Other',
-        available: usable,
-        intervals: intervals,
-        alternatives: alternatives,
-      ));
+      result.add(
+        _UnavailableWindow(
+          equipmentId: eqDoc.id,
+          equipmentName: eqData['name'] as String? ?? eqDoc.id,
+          category: eqData['category'] as String? ?? 'Other',
+          available: usable,
+          intervals: intervals,
+          alternatives: alternatives,
+        ),
+      );
     }
 
     result.sort((a, b) => a.equipmentName.compareTo(b.equipmentName));
@@ -369,7 +389,10 @@ class _ConflictEngine {
     final alternatives = <DateTimeRange>[];
 
     // Candidate start points: today, and 1 day after each interval ends.
-    final candidates = [now, ...busy.map((b) => _dateOnly(b.end).add(const Duration(days: 1)))];
+    final candidates = [
+      now,
+      ...busy.map((b) => _dateOnly(b.end).add(const Duration(days: 1))),
+    ];
 
     for (final start in candidates) {
       if (start.isBefore(now)) continue;
@@ -514,8 +537,9 @@ class ConflictDetectionPage extends StatelessWidget {
           }
 
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream:
-                FirebaseFirestore.instance.collection('bookings').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('bookings')
+                .snapshots(),
             builder: (context, bkSnap) {
               if (bkSnap.hasError) {
                 return _errorState('Could not load booking data.');
@@ -542,57 +566,66 @@ class ConflictDetectionPage extends StatelessWidget {
   }
 
   Widget _errorState(String message) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.cloud_off_outlined,
-                  size: 48, color: Color(0xff667085)),
-              const SizedBox(height: 14),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xff667085))),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.cloud_off_outlined,
+            size: 48,
+            color: Color(0xff667085),
           ),
-        ),
-      );
+          const SizedBox(height: 14),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xff667085)),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _allClearState() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: const Color(0xffd1fae5),
-                  borderRadius: BorderRadius.circular(36),
-                ),
-                child: const Icon(Icons.check_circle_outline_rounded,
-                    size: 40, color: Color(0xff059669)),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'All Clear!',
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xff059669)),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'No shortages, overlapping bookings, or unavailable '
-                'time windows were detected.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xff667085), height: 1.5),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xffd1fae5),
+              borderRadius: BorderRadius.circular(36),
+            ),
+            child: const Icon(
+              Icons.check_circle_outline_rounded,
+              size: 40,
+              color: Color(0xff059669),
+            ),
           ),
-        ),
-      );
+          const SizedBox(height: 18),
+          const Text(
+            'All Clear!',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xff059669),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'No shortages, overlapping bookings, or unavailable '
+            'time windows were detected.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xff667085), height: 1.5),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -631,7 +664,10 @@ class _ConflictReportState extends State<_ConflictReport>
         _SummaryBanner(result: r),
         TabBar(
           controller: _tabs,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
           tabs: [
             Tab(
               child: _TabLabel(
@@ -687,14 +723,13 @@ class _SummaryBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasCritical = result.shortages.any((s) => s.isCritical) ||
+    final hasCritical =
+        result.shortages.any((s) => s.isCritical) ||
         result.conflicts.isNotEmpty;
 
     return Container(
       width: double.infinity,
-      color: hasCritical
-          ? const Color(0xfffff1f2)
-          : const Color(0xfffff7ed),
+      color: hasCritical ? const Color(0xfffff1f2) : const Color(0xfffff7ed),
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
       child: Row(
         children: [
@@ -712,10 +747,10 @@ class _SummaryBanner extends StatelessWidget {
             child: Text(
               hasCritical
                   ? '${result.shortages.length} shortage${result.shortages.length == 1 ? '' : 's'}, '
-                      '${result.conflicts.length} booking conflict${result.conflicts.length == 1 ? '' : 's'} '
-                      'require immediate attention.'
+                        '${result.conflicts.length} booking conflict${result.conflicts.length == 1 ? '' : 's'} '
+                        'require immediate attention.'
                   : '${result.unavailableWindows.length} equipment item${result.unavailableWindows.length == 1 ? '' : 's'} '
-                      'have fully-booked time windows. Review alternatives below.',
+                        'have fully-booked time windows. Review alternatives below.',
               style: TextStyle(
                 color: hasCritical
                     ? const Color(0xff991b1b)
@@ -799,10 +834,12 @@ class _ShortageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final critical = shortage.isCritical;
-    final borderColor =
-        critical ? const Color(0xffdc2626) : const Color(0xffea580c);
-    final bgColor =
-        critical ? const Color(0xfffff1f2) : const Color(0xfffff7ed);
+    final borderColor = critical
+        ? const Color(0xffdc2626)
+        : const Color(0xffea580c);
+    final bgColor = critical
+        ? const Color(0xfffff1f2)
+        : const Color(0xfffff7ed);
 
     return Card(
       elevation: 0,
@@ -838,11 +875,12 @@ class _ShortageCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            _row(Icons.calendar_today_outlined,
-                '${_fmt(shortage.start)} → ${_fmt(shortage.end)}'),
+            _row(
+              Icons.calendar_today_outlined,
+              '${_fmt(shortage.start)} → ${_fmt(shortage.end)}',
+            ),
             const SizedBox(height: 4),
-            _row(Icons.event_outlined,
-                'Booking: ${shortage.bookingEventName}'),
+            _row(Icons.event_outlined, 'Booking: ${shortage.bookingEventName}'),
             const SizedBox(height: 4),
             _row(
               Icons.inventory_2_outlined,
@@ -852,8 +890,10 @@ class _ShortageCard extends StatelessWidget {
             if (shortage.isCritical) ...[
               const SizedBox(height: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xffdc2626).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
@@ -914,8 +954,7 @@ class _ConflictCard extends StatelessWidget {
       color: const Color(0xfffff7ed),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side:
-            BorderSide(color: const Color(0xffea580c).withValues(alpha: 0.4)),
+        side: BorderSide(color: const Color(0xffea580c).withValues(alpha: 0.4)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -924,8 +963,11 @@ class _ConflictCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.compare_arrows_rounded,
-                    color: Color(0xffea580c), size: 20),
+                const Icon(
+                  Icons.compare_arrows_rounded,
+                  color: Color(0xffea580c),
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 const Text(
                   'Booking Conflict',
@@ -970,39 +1012,43 @@ class _ConflictCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            ...conflict.sharedEquipment.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.inventory_2_outlined,
-                          size: 14, color: Color(0xff667085)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          item.name,
-                          style: const TextStyle(fontSize: 13),
-                        ),
+            ...conflict.sharedEquipment.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.inventory_2_outlined,
+                      size: 14,
+                      color: Color(0xff667085),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: const TextStyle(fontSize: 13),
                       ),
-                      Text(
-                        '${item.reservedByA} + ${item.reservedByB} = '
-                        '${item.totalReserved} / ${item.available} avail',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xffdc2626),
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ),
+                    Text(
+                      '${item.reservedByA} + ${item.reservedByB} = '
+                      '${item.totalReserved} / ${item.available} avail',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xffdc2626),
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _bookingChip(
-      String name, DateTime start, DateTime end, Color color) {
+  Widget _bookingChip(String name, DateTime start, DateTime end, Color color) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1018,14 +1064,21 @@ class _ConflictCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: color,
-                        fontSize: 13)),
-                Text('${_fmt(start)} – ${_fmt(end)}',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xff667085))),
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  '${_fmt(start)} – ${_fmt(end)}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xff667085),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1074,8 +1127,7 @@ class _WindowCard extends StatelessWidget {
       color: const Color(0xfff5f3ff),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side:
-            BorderSide(color: const Color(0xff7c3aed).withValues(alpha: 0.3)),
+        side: BorderSide(color: const Color(0xff7c3aed).withValues(alpha: 0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1084,8 +1136,11 @@ class _WindowCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.block_outlined,
-                    color: Color(0xff7c3aed), size: 20),
+                const Icon(
+                  Icons.block_outlined,
+                  color: Color(0xff7c3aed),
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1115,38 +1170,50 @@ class _WindowCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            ...window.intervals.map((interval) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.do_not_disturb_alt_outlined,
-                          size: 14, color: Color(0xff7c3aed)),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${_fmt(interval.start)} – ${_fmt(interval.end)}',
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600),
+            ...window.intervals.map(
+              (interval) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.do_not_disturb_alt_outlined,
+                      size: 14,
+                      color: Color(0xff7c3aed),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${_fmt(interval.start)} – ${_fmt(interval.end)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '(${interval.bookingName})',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 11, color: Color(0xff667085)),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '(${interval.bookingName})',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xff667085),
                         ),
                       ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             if (window.alternatives.isNotEmpty) ...[
               const SizedBox(height: 10),
               const Divider(height: 1),
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(Icons.tips_and_updates_outlined,
-                      size: 15, color: Color(0xff059669)),
+                  const Icon(
+                    Icons.tips_and_updates_outlined,
+                    size: 15,
+                    color: Color(0xff059669),
+                  ),
                   const SizedBox(width: 6),
                   const Text(
                     'Available windows (alternatives):',
@@ -1159,40 +1226,48 @@ class _WindowCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              ...window.alternatives.map((alt) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today_outlined,
-                            size: 13, color: Color(0xff059669)),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${_fmt(alt.start)} – ${_fmt(alt.end)}',
-                          style: const TextStyle(
-                            fontSize: 12,
+              ...window.alternatives.map(
+                (alt) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 13,
+                        color: Color(0xff059669),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${_fmt(alt.start)} – ${_fmt(alt.end)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xff059669),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xffd1fae5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Available',
+                          style: TextStyle(
+                            fontSize: 10,
                             color: Color(0xff059669),
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xffd1fae5),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Available',
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: Color(0xff059669),
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ],
         ),
@@ -1205,8 +1280,7 @@ class _WindowCard extends StatelessWidget {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-Widget _emptyTab(
-    IconData icon, String title, String message, Color color) {
+Widget _emptyTab(IconData icon, String title, String message, Color color) {
   return Center(
     child: Padding(
       padding: const EdgeInsets.all(32),
@@ -1215,11 +1289,14 @@ Widget _emptyTab(
         children: [
           Icon(icon, size: 44, color: color),
           const SizedBox(height: 14),
-          Text(title,
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: color)),
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: color,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             message,
@@ -1233,30 +1310,30 @@ Widget _emptyTab(
 }
 
 Widget _badge(String label, Color color) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-            color: color, fontSize: 11, fontWeight: FontWeight.w600),
-      ),
-    );
+  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+  decoration: BoxDecoration(
+    color: color.withValues(alpha: 0.1),
+    borderRadius: BorderRadius.circular(20),
+  ),
+  child: Text(
+    label,
+    style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+  ),
+);
 
 Widget _row(IconData icon, String text) => Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 14, color: const Color(0xff98a2b3)),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(text,
-              style:
-                  const TextStyle(fontSize: 12, color: Color(0xff374151))),
-        ),
-      ],
-    );
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Icon(icon, size: 14, color: const Color(0xff98a2b3)),
+    const SizedBox(width: 6),
+    Expanded(
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12, color: Color(0xff374151)),
+      ),
+    ),
+  ],
+);
 
 String _fmt(DateTime? d) {
   if (d == null) return '—';

@@ -60,6 +60,9 @@ void main() {
     expect(hasRolePermission('operations_manager', 'dispatch.assign'), isTrue);
     expect(hasRolePermission('operations_manager', 'returns.approve'), isTrue);
     expect(hasRolePermission('operations_manager', 'dashboard.view'), isTrue);
+    expect(hasRolePermission('operations_manager', 'bookings.create'), isTrue);
+    expect(hasRolePermission('operations_manager', 'bookings.edit'), isTrue);
+    expect(hasRolePermission('operations_manager', 'bookings.cancel'), isFalse);
     expect(hasRolePermission('operations_manager', 'returns.record'), isFalse);
     expect(hasRolePermission('operations_manager', 'users.manage'), isFalse);
   });

@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -34,10 +33,15 @@ class BookingManagementPage extends StatelessWidget {
     );
     if (confirmed != true) return;
     try {
-      final requestId = _bookings.doc().id;
-      await FirebaseFunctions.instance.httpsCallable('cancelBooking').call({
-        'bookingId': id,
-        'requestId': requestId,
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw StateError('Sign in before cancelling a booking.');
+      }
+      await _bookings.doc(id).update({
+        'status': 'cancelled',
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'updatedBy': user.uid,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -97,12 +101,12 @@ class BookingManagementPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Bookings')),
       floatingActionButton: canCreate
           ? FloatingActionButton.extended(
-        onPressed: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute<void>(builder: (_) => const NewBookingPage())),
-        icon: const Icon(Icons.add),
-        label: const Text('New booking'),
-      )
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const NewBookingPage()),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('New booking'),
+            )
           : null,
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _bookings.snapshots(),

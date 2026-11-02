@@ -24,7 +24,7 @@ import {setGlobalOptions} from "firebase-functions";
 // functions should each use functions.runWith({ maxInstances: 10 }) instead.
 // In the v1 API, each function can only serve one request per container, so
 // this will be the maximum concurrent request count.
-setGlobalOptions({maxInstances: 10});
+setGlobalOptions({maxInstances: 10, region: "asia-south1"});
 export {setUserRole} from "./setUserRole";
 export {cancelBooking, saveBooking} from "./bookings";
 export {retireEquipment, saveEquipment} from "./equipment";
