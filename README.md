@@ -1,171 +1,190 @@
-# VenueVault
+﻿# VenueVault
 
-VenueVault is a Flutter mobile application backed by Firebase for event
-equipment booking, inventory, dispatch, and return tracking.
+VenueVault is a Flutter application for managing event equipment rentals, from inventory and booking to dispatch, returns, and inspection. It uses Firebase Authentication and Cloud Firestore, with a TypeScript Cloud Functions backend included in the repository.
 
-## Key Features
+## Implemented features
 
-- **Equipment Inventory Tracking**: Monitor real-time availability, stock counts, and categories (audio, lighting, staging, power, cables).
-- **Booking & Conflict Prevention**: Validate overlapping date ranges and equipment reservations before confirmation to prevent double-booking.
-- **Dispatch Management**: View daily dispatches, manage packing checklists, and update item status from warehouse to venue delivery.
-- **Return & Inspection Tracking**: Track returned gear, record damages or missing accessories, and restore inventory back to available stock.
-- **Operations Dashboard**: Show upcoming events, usable stock, open dispatches, overdue returns, pending inspections, and booking conflicts to authorized managers.
-- **Secure Multi-Role Access**: Backed by Firebase Authentication and Firestore security rules to protect operational and client data.
+- **Staff authentication:** Email and password sign-in, password reset, and access based on Firebase Auth role claims.
+- **Equipment catalog:** Search and filter equipment, view stock and equipment details, and manage catalog entries, stock, condition, maintenance notes, and retirement according to staff permissions.
+- **Booking management:** Create, edit, view, and cancel bookings with customer details, event information, date ranges, and equipment quantities. The booking form checks availability against existing reservations.
+- **Booking calendar:** Browse bookings by date and view event details for a selected day.
+- **Conflict reporting:** View equipment shortages, overlapping reservations, and unavailable equipment windows in a read-only report.
+- **Dispatch operations:** View dispatch jobs, assign staff, manage packing checklists, and update delivery progress according to role permissions.
+- **Returns and inspections:** Record returned, damaged, and missing quantities, approve inspections, and track equipment that remains unavailable.
+- **Operations dashboard:** Review upcoming events, usable stock, open dispatches, overdue returns, pending inspections, and conflicts. Authorized staff can also view audit records.
 
-## Tech Stack
+These features are implemented in the source. Deployment status and end-to-end production readiness are not established by this README.
 
-- **Frontend**: Flutter (Dart), Material 3 design
-- **Backend**: Firebase Cloud Functions (TypeScript / Node.js 24)
-- **Database**: Cloud Firestore
-- **Authentication**: Firebase Auth
-- **Hosting & Emulators**: Firebase Hosting and Firebase Local Emulator Suite
+## Technology stack
+
+| Layer | Technology |
+| --- | --- |
+| Application | Flutter, Dart, Material 3 |
+| Authentication | Firebase Authentication |
+| Database | Cloud Firestore |
+| Backend | Cloud Functions for Firebase, TypeScript, Node.js 24 |
+| Access control | Firebase Auth custom claims and Firestore Security Rules |
+| Local development | Firebase Local Emulator Suite |
+| Static hosting | Firebase Hosting configuration and starter page |
 
 ## Repository structure
 
 ```text
-.
-├── app/                    # Flutter application project
-│   ├── lib/                # Application code and Firebase configuration
-│   ├── android/            # Android platform project
-│   ├── ios/                # iOS platform project
-│   └── pubspec.yaml        # Flutter dependencies
-├── functions/              # Firebase Cloud Functions (TypeScript)
-├── firestore.rules         # Firestore security rules
-├── firestore.indexes.json  # Firestore indexes
-├── firebase.json           # Firebase services and emulators
-└── public/                 # Firebase Hosting files
+app/
+  lib/                    Flutter screens, availability logic, and role permissions
+  test/                   Authentication UI and role-permission tests
+  android/, ios/, ...     Flutter platform projects
+  pubspec.yaml            App dependencies and Dart SDK requirement
+functions/
+  src/                    Callable functions, Firestore triggers, and unit tests
+  scripts/set-role.js     Emulator-only role assignment helper
+  package.json            Backend dependencies and commands
+public/                   Firebase Hosting starter page
+firestore.rules           Firestore access rules and data validation
+firestore.indexes.json    Firestore index definitions
+firebase.json             Root Firebase service and emulator configuration
+PRD.md                    Product requirements
 ```
 
-The Flutter app and Firebase Functions are intentionally kept in one
-repository. The app is the client; `functions/` contains trusted server-side
-operations and must not be moved into `app/lib/`.
+The application project is under `app/`. Run Flutter commands there. Backend commands run separately under `functions/`.
 
-Staff permissions are carried in Firebase Authentication custom claims and
-checked by both callable functions and Firestore rules. Booking, inventory,
-dispatch, and return mutations go through trusted Functions; Firestore client
-writes for those records are denied. A confirmed booking creates its dispatch
-at `dispatches/{bookingId}`, using the booking ID to make retries idempotent.
+## Architecture and current limitations
 
-The staff roles follow the operations responsibility matrix: Booking Staff can
-manage bookings; Warehouse Staff manage stock, checklists, and return
-inspections; Dispatch Staff can view assigned dispatches and update their
-statuses; Operations Managers can assign dispatches, approve returns, view the
-dashboard and audit trail, and review conflict reports. Admin has every
-defined application permission. Private user profile documents remain
-owner-readable; role assignment is handled through the Admin-authorized role
-management function. The current conflict screen is read-only; conflict
-resolution actions are not yet exposed in the app.
+The Flutter app uses Firebase Authentication for sign-in and reads the user's `role` custom claim to control access to screens and actions. Firestore rules enforce database access separately from the interface.
 
-### Assigning staff roles
+The current client reads and writes operational records directly through the Firestore SDK, including transactions for some workflows. The backend also contains callable functions for booking, equipment, dispatch, returns, dashboard summaries, and role management. These callables are not currently wired into the Flutter client; `cloud_functions` is not listed as an app dependency.
 
-1. In Firebase Console, open **Authentication → Users**. Create the account if
-   needed and copy its UID. The Console manages accounts but does not edit
-   custom role claims.
-2. To create the first Admin, use a trusted Firebase Admin SDK environment to
-   set the user's custom claim to `{ "role": "admin" }`. The deployed
-   `setUserRole` callable is Admin-only, so it cannot create the first Admin.
-   Never put service-account credentials in the Flutter app or commit them.
-3. After an Admin exists, assign subsequent roles through the
-   Admin-authorized `setUserRole` callable with the target user's UID and one
-   of `booking_staff`, `warehouse_staff`, `dispatch_staff`,
-   `operations_manager`, or `admin`. There is currently no role-management
-   screen in the app, so this callable must be invoked by authorized
-   Admin-only tooling.
-4. Have the affected user sign out and back in to refresh the Firebase Auth
-   token. The app reads the role from the token's `role` custom claim.
+The backend includes Firestore triggers to create and synchronize dispatch records for confirmed bookings. Dispatch records use the booking ID as their document ID. Automatic dispatch creation requires those triggers to be deployed or running locally.
 
-The emulator-only `functions/scripts/set-role.js` helper is for local
-development and must not be used to assign production roles.
+Keep the following implementation limits in mind:
+
+- Availability checks exist in the client, but the app does not currently use the server-side booking callable that serializes availability checks. Client checks alone do not guarantee prevention of simultaneous conflicting reservations.
+- Conflict reporting is read-only; the app does not expose dedicated conflict-resolution actions.
+- Role management is available through an Admin-only callable, with no role-management screen in the app.
+- The root `firebase.json` configures Firestore, Hosting, and Auth/Firestore/Hosting emulators. It does not currently declare a Functions source or Functions emulator configuration, so Functions setup is required before deployment or local trigger testing.
+- Hosting currently serves `public/index.html`, a Firebase starter page. It does not serve a built Flutter web app.
+- Firebase options are included for web, Android, iOS, macOS, and Windows. Linux Firebase options are not configured.
+
+## Staff roles
+
+| Role claim | Main responsibilities |
+| --- | --- |
+| `admin` | All defined application permissions, including catalog and user-role management |
+| `booking_staff` | View inventory and bookings; create, edit, and cancel bookings |
+| `warehouse_staff` | View inventory and bookings; update stock, manage checklists, record returns, and track equipment issues |
+| `dispatch_staff` | View assigned dispatches and update their status |
+| `operations_manager` | Manage bookings, assign dispatches, approve returns, and review dashboard, conflicts, and audit records |
+
+Permission definitions are in `app/lib/role_permissions.dart` and `functions/src/roles.ts`; database access is enforced in `firestore.rules`. A missing or unrecognized role receives no application permissions.
+
+### Assigning roles
+
+1. Create the staff account in Firebase Authentication and copy its UID. The app provides sign-in rather than public account registration.
+2. Bootstrap the first Admin from a trusted Firebase Admin SDK environment by setting the custom claim to `{ "role": "admin" }`.
+3. Use the Admin-authorized `setUserRole` callable for subsequent assignments. It accepts a target UID and one of the role claims listed above. The callable must be deployed or otherwise made available before use.
+4. Have the affected user sign out and back in to refresh their Auth token.
+
+The Firebase Console manages accounts but does not directly edit custom role claims. Keep Admin SDK credentials outside the Flutter client and repository.
 
 ## Local setup
 
 ### Prerequisites
 
-Ensure you have the following installed:
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.x)
-- [Node.js](https://nodejs.org/) (v20+) & npm
-- [Firebase CLI](https://firebase.google.com/docs/cli) (`npm install -g firebase-tools`)
-- [FlutterFire CLI](https://firebase.flutter.dev/docs/cli/) (`dart pub global activate flutterfire_cli`)
+- A Flutter SDK with Dart compatible with `^3.13.5`, as declared in `app/pubspec.yaml`.
+- Node.js 24 and npm, matching `functions/package.json`.
+- Firebase CLI for emulator and Firebase service commands.
+- Java for the Firestore emulator.
+- FlutterFire CLI if you need to regenerate Firebase configuration.
+- Platform tooling for the device or desktop target you intend to run.
 
-### Mobile App Setup
+### Run the application
 
-From the repository root run:
+From the repository root:
 
 ```powershell
 cd app
 flutter pub get
-flutterfire configure --project=venue-vault-kalvium-community
-```
-
-`flutterfire configure` registers the mobile apps and generates
-`app/lib/firebase_options.dart` plus the platform Firebase configuration
-files. The generated platform projects are already included under `app/`.
-
-Run the mobile app with:
-
-```powershell
 flutter run
 ```
 
-### Backend Setup (Cloud Functions)
+Firebase options are already included in `app/lib/firebase_options.dart`. The default Firebase project in `.firebaserc` is `venue-vault-kalvium-community`. Running without the emulator flag connects to the configured Firebase services and requires a provisioned staff account and appropriate role.
 
-Install and build the backend separately:
+If you are connecting your own project, regenerate the app configuration from `app/`:
 
 ```powershell
-cd ..
+flutterfire configure --project=<your-project-id>
+```
+
+Also update the root Firebase project selection for CLI commands.
+
+### Build the backend
+
+In a terminal at the repository root:
+
+```powershell
 cd functions
 npm ci
 npm run lint
 npm run build
 ```
 
-### Running with Firebase Local Emulators
+This compiles the TypeScript source to `functions/lib/`. Building does not deploy the functions or connect them to the Flutter app.
 
-For offline testing and local backend development, you can run the Firebase Emulator Suite:
+### Run the configured emulators
+
+From the repository root:
 
 ```powershell
 firebase emulators:start
 ```
 
-This starts local emulators for:
-- **Authentication**: `localhost:9099`
-- **Cloud Functions**: `localhost:5001`
-- **Cloud Firestore**: `localhost:8080`
-- **Hosting**: `localhost:5000`
-- **Emulator Suite UI**: `http://localhost:4000`
+| Service | Local address |
+| --- | --- |
+| Authentication | `127.0.0.1:9099` |
+| Firestore | `127.0.0.1:8080` |
+| Hosting | `http://127.0.0.1:5000` |
+| Emulator UI | Usually `http://127.0.0.1:4000`; check the CLI output |
 
-The Firebase project is already selected in `.firebaserc`. Do not commit
-secrets, local Firebase credentials, or generated build output.
+In another terminal, run the application from `app/`:
+
+```powershell
+flutter run --dart-define=USE_FIREBASE_EMULATORS=true
+```
+
+The flag connects Auth and Firestore to the hardcoded host `127.0.0.1` in `app/lib/main.dart`. For an Android emulator or physical device, adjust the host or configure port forwarding so the device can reach the development machine.
+
+Create a local user in the Auth emulator before assigning a role. After building the backend, run this helper from `functions/`:
+
+```powershell
+$env:FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099"
+node scripts/set-role.js staff@example.com admin
+```
+
+The helper only works with the Auth emulator and refuses to run without `FIREBASE_AUTH_EMULATOR_HOST`. Sign in again after assigning the role. The Functions emulator is not included in the current root configuration, so this setup does not run backend triggers or callables.
+
+## Validation
+
+Run the application checks from `app/`:
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Run the backend checks from `functions/`:
+
+```powershell
+npm run lint
+npm test
+```
+
+`npm test` builds the backend before running its Node.js unit tests. Existing tests cover backend role permissions, role-change safeguards, booking availability, and dashboard calculations, plus Flutter authentication UI and role permissions. These checks do not establish complete end-to-end coverage of operational workflows or Firestore rules.
 
 ## Contributing
 
-To contribute to VenueVault:
-
 1. Create a focused branch from the default branch.
-2. Make the smallest change that addresses the issue or feature.
-3. Run the relevant Flutter checks and backend checks before opening a PR:
+2. Make the change and update relevant documentation.
+3. Run the checks appropriate to the affected app or backend code.
+4. Open a pull request with a clear summary, validation results, and screenshots for interface changes.
 
-   ```powershell
-   cd app
-   flutter analyze
-   flutter test
-   cd ..
-   cd functions
-   npm run lint
-   npm run build
-   ```
-
-4. Open a pull request with a clear summary, testing details, and screenshots
-   for UI changes.
-
-Keep pull requests focused and avoid committing generated files, build
-artifacts, Firebase credentials, or unrelated formatting changes.
-thank you
-thanks 
-
-venuevault
-
-spirit 2
-hiii
-
-helloo
+Keep credentials, local logs, dependency directories, and generated build output out of commits. Keep the Flutter client in `app/` and trusted backend code in `functions/`.
