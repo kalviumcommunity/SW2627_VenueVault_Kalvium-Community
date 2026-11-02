@@ -92,6 +92,7 @@ class EquipmentItem {
     'rentalPrice': rentalPrice,
     'description': description,
     'maintenanceNotes': maintenanceNotes,
+    'updatedAt': FieldValue.serverTimestamp(),
   };
 }
 
@@ -151,17 +152,9 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
 
     try {
       if (item == null) {
-        final requestId = _items.doc().id;
-        await FirebaseFunctions.instance.httpsCallable('saveEquipment').call({
-          'requestId': requestId,
-          'equipment': result.toFirestore(),
-        });
+        await _items.add(result.toFirestore());
       } else {
-        await FirebaseFunctions.instance.httpsCallable('saveEquipment').call({
-          'requestId': _items.doc().id,
-          'equipmentId': item.id,
-          'equipment': result.toFirestore(),
-        });
+        await _items.doc(item.id).update(result.toFirestore());
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -171,11 +164,6 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
           ),
         ),
       );
-    } on FirebaseFunctionsException catch (error) {
-      final message = error.code == 'permission-denied'
-          ? 'You do not have permission to edit this equipment or change its rental price. Ask an admin for access.'
-          : error.message ?? 'Could not save equipment.';
-      _showErrorMessage(message);
     } on FirebaseException catch (error) {
       _showError(error);
     }
@@ -203,12 +191,15 @@ class _EquipmentCatalogPageState extends State<EquipmentCatalogPage> {
     );
     if (confirmed != true) return;
     try {
-      await FirebaseFunctions.instance.httpsCallable('retireEquipment').call({
-        'equipmentId': item.id,
-        'requestId': _items.doc().id,
+      await _items.doc(item.id).update({
+        'status': 'Retired',
+        'availableQuantity': 0,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
-    } on FirebaseFunctionsException catch (error) {
-      _showErrorMessage(error.message ?? 'Could not retire equipment.');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Equipment retired.')),
+      );
     } on FirebaseException catch (error) {
       _showError(error);
     }
