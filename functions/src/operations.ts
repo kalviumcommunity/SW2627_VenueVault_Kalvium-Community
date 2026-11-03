@@ -128,15 +128,21 @@ const ensureDispatch = async (bookingId: string) => {
         "Event booking",
       venue: typeof booking.venue === "string" ? booking.venue : "",
       dispatchDate: booking.startDate ?? null,
+      dispatchTime: booking.startDate ?? null,
+      pickupDate: booking.endDate ?? null,
+      assignedStaffName: typeof booking.staffName === "string" ?
+        booking.staffName :
+        "",
+      assignedStaffUid: null,
+      transportReference: "",
       items: items.map((item) => ({
         ...item,
         packed: false,
         missing: false,
       })),
-      assignedStaffUid: null,
-      transportReference: "",
       status: "pending",
-      createdAt: FieldValue.serverTimestamp(),
+      createdBy: booking.createdBy ?? "system",
+      updatedBy: booking.updatedBy ?? booking.createdBy ?? "system",
       updatedAt: FieldValue.serverTimestamp(),
     });
     writeAudit(

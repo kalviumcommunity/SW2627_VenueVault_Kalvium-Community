@@ -672,6 +672,9 @@ class _ConflictReportState extends State<_ConflictReport>
         _SummaryBanner(result: r),
         TabBar(
           controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 12),
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 13,
@@ -1182,6 +1185,7 @@ class _WindowCard extends StatelessWidget {
               (interval) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
                       Icons.do_not_disturb_alt_outlined,
@@ -1189,22 +1193,28 @@ class _WindowCard extends StatelessWidget {
                       color: Color(0xff7c3aed),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      '${_fmt(interval.start)} – ${_fmt(interval.end)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
                     Expanded(
-                      child: Text(
-                        '(${interval.bookingName})',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xff667085),
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text:
+                                  '${_fmt(interval.start)} – ${_fmt(interval.end)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '  (${interval.bookingName})',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xff667085),
+                              ),
+                            ),
+                          ],
                         ),
+                        softWrap: true,
                       ),
                     ),
                   ],
@@ -1238,6 +1248,7 @@ class _WindowCard extends StatelessWidget {
                 (alt) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(
                         Icons.calendar_today_outlined,
@@ -1245,12 +1256,15 @@ class _WindowCard extends StatelessWidget {
                         color: Color(0xff059669),
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        '${_fmt(alt.start)} – ${_fmt(alt.end)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xff059669),
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Text(
+                          '${_fmt(alt.start)} – ${_fmt(alt.end)}',
+                          softWrap: true,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xff059669),
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),

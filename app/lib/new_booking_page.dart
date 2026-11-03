@@ -192,12 +192,45 @@ class _NewBookingPageState extends State<NewBookingPage> {
           'createdAt': FieldValue.serverTimestamp(),
         },
       };
+      final dispatchRef = db.collection('dispatches').doc(bookingRef.id);
+      final dispatchData = <String, dynamic>{
+        'bookingId': bookingRef.id,
+        'eventName': data['eventName'],
+        'venue': data['venue'],
+        'dispatchDate': data['startDate'],
+        'dispatchTime': data['startDate'],
+        'pickupDate': data['endDate'],
+        'assignedStaffName': data['staffName'],
+        'items': items
+            .map((item) => {...item, 'packed': false, 'missing': false})
+            .toList(),
+        'status': existing?.data()?['status'] == 'confirmed'
+            ? 'pending'
+            : (existing?.data()?['status'] ?? 'pending'),
+        'createdBy': existing?.data()?['createdBy'] ?? user.uid,
+        'updatedBy': user.uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
       await db.runTransaction((transaction) async {
         final currentBooking = await transaction.get(bookingRef);
+        final currentDispatch = existing == null
+            ? null
+            : await transaction.get(dispatchRef);
         if (currentBooking.exists) {
           transaction.update(bookingRef, bookingData);
         } else {
           transaction.set(bookingRef, bookingData);
+        }
+        if (currentDispatch?.exists == true) {
+          transaction.update(dispatchRef, {
+            ...dispatchData,
+            'status': currentDispatch?.data()?['status'] ?? 'pending',
+            'assignedStaffUid': currentDispatch?.data()?['assignedStaffUid'],
+            'transportReference': currentDispatch
+                ?.data()?['transportReference'],
+          });
+        } else {
+          transaction.set(dispatchRef, dispatchData);
         }
       });
       if (mounted) {
@@ -340,22 +373,34 @@ class _NewBookingPageState extends State<NewBookingPage> {
         ],
       ),
       bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: FilledButton.icon(
-          onPressed: _saving ? null : _saveBooking,
-          icon: _saving
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.save_outlined),
-          label: Text(
-            _saving
-                ? 'Saving…'
-                : widget.initialBookingId == null
-                ? 'Create booking'
-                : 'Save changes',
+        minimum: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          ),
+          child: FilledButton.icon(
+            onPressed: _saving ? null : _saveBooking,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check_circle_outline),
+            label: Text(
+              _saving
+                  ? 'Saving…'
+                  : widget.initialBookingId == null
+                  ? 'Create booking'
+                  : 'Save changes',
+            ),
           ),
         ),
       ),
@@ -385,8 +430,14 @@ class _DateSelectionPanel extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      color: const Color(0xFFEFF1FF),
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xffeef2ff), Color(0xfff8faff)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -394,8 +445,8 @@ class _DateSelectionPanel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 34,
+                height: 34,
                 alignment: Alignment.center,
                 decoration: const BoxDecoration(
                   color: Colors.indigo,
@@ -436,18 +487,18 @@ class _DateSelectionPanel extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: SizedBox(
-              width: 240,
+              width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onSelectDates,
                 icon: const Icon(Icons.calendar_today_outlined, size: 18),
                 label: Text(dateLabel),
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: Colors.black87,
-                  side: BorderSide.none,
+                  foregroundColor: const Color(0xff25215f),
+                  side: const BorderSide(color: Color(0xffc7d2fe)),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
-                    vertical: 12,
+                    vertical: 14,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -465,6 +516,11 @@ class _DateSelectionPanel extends StatelessWidget {
                     onPressed: onSelectStartTime,
                     icon: const Icon(Icons.login_outlined, size: 18),
                     label: Text('Start ${_formatTime(selectedDates!.start)}'),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xff25215f),
+                      side: const BorderSide(color: Color(0xffc7d2fe)),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -473,6 +529,11 @@ class _DateSelectionPanel extends StatelessWidget {
                     onPressed: onSelectEndTime,
                     icon: const Icon(Icons.logout_outlined, size: 18),
                     label: Text('End ${_formatTime(selectedDates!.end)}'),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xff25215f),
+                      side: const BorderSide(color: Color(0xffc7d2fe)),
+                    ),
                   ),
                 ),
               ],
@@ -563,42 +624,56 @@ class _InventoryReadyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
       children: [
-        Text(
-          'Booking details',
-          style: Theme.of(context).textTheme.titleLarge
-              ?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        _bookingField(
-          customerController,
-          'Customer name *',
-          Icons.person_outline,
+        _sectionHeading(
+          context,
+          icon: Icons.receipt_long_outlined,
+          title: 'Booking details',
+          subtitle: 'Capture the event and customer information.',
         ),
         const SizedBox(height: 10),
-        _bookingField(
-          phoneController,
-          'Customer phone',
-          Icons.phone_outlined,
-          keyboardType: TextInputType.phone,
-        ),
-        const SizedBox(height: 10),
-        _bookingField(eventController, 'Event name *', Icons.event_outlined),
-        const SizedBox(height: 10),
-        _bookingField(venueController, 'Venue *', Icons.place_outlined),
-        const SizedBox(height: 10),
-        _bookingField(
-          staffController,
-          'Assigned staff *',
-          Icons.badge_outlined,
-        ),
-        const SizedBox(height: 10),
-        _bookingField(
-          notesController,
-          'Notes',
-          Icons.notes_outlined,
-          maxLines: 2,
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _bookingField(
+                  customerController,
+                  'Customer name *',
+                  Icons.person_outline,
+                ),
+                const SizedBox(height: 10),
+                _bookingField(
+                  phoneController,
+                  'Customer phone',
+                  Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 10),
+                _bookingField(
+                  eventController,
+                  'Event name *',
+                  Icons.event_outlined,
+                ),
+                const SizedBox(height: 10),
+                _bookingField(venueController, 'Venue *', Icons.place_outlined),
+                const SizedBox(height: 10),
+                _bookingField(
+                  staffController,
+                  'Assigned staff *',
+                  Icons.badge_outlined,
+                ),
+                const SizedBox(height: 10),
+                _bookingField(
+                  notesController,
+                  'Notes',
+                  Icons.notes_outlined,
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 24),
         Row(
@@ -607,16 +682,11 @@ class _InventoryReadyState extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Available inventory',
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Stock remaining after reservations for the selected dates.',
-                    style: Theme.of(context).textTheme.bodySmall
-                        ?.copyWith(color: Colors.grey.shade600),
+                  _sectionHeading(
+                    context,
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Available inventory',
+                    subtitle: 'Choose equipment for this time window.',
                   ),
                 ],
               ),
@@ -625,6 +695,10 @@ class _InventoryReadyState extends StatelessWidget {
               Chip(
                 avatar: const Icon(Icons.check_circle_outline, size: 18),
                 label: Text('${selectedInventory.length} selected'),
+                labelStyle: const TextStyle(
+                  color: Color(0xff3730a3),
+                  fontWeight: FontWeight.w700,
+                ),
                 backgroundColor: const Color(0xffe0e7ff),
                 side: BorderSide.none,
               ),
@@ -637,6 +711,8 @@ class _InventoryReadyState extends StatelessWidget {
           decoration: InputDecoration(
             hintText: 'Search equipment',
             prefixIcon: const Icon(Icons.search),
+            filled: true,
+            fillColor: Colors.white,
             suffixIcon: IconButton(
               onPressed: () {},
               icon: const Icon(Icons.tune_rounded),
@@ -770,9 +846,61 @@ class _InventoryReadyState extends StatelessWidget {
     decoration: InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon),
-      border: const OutlineInputBorder(),
+      filled: true,
+      fillColor: const Color(0xfffafbff),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xff4f46e5), width: 1.5),
+      ),
       isDense: true,
     ),
+  );
+
+  Widget _sectionHeading(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) => Row(
+    children: [
+      Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: const Color(0xffe0e7ff),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: const Color(0xff4f46e5)),
+      ),
+      const SizedBox(width: 11),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xff17153b),
+              ),
+            ),
+            Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: const Color(0xff667085)),
+            ),
+          ],
+        ),
+      ),
+    ],
   );
 
   IconData _iconForCategory(String category) {
