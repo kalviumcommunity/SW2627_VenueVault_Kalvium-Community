@@ -749,6 +749,12 @@ class _OperationsDashboardState extends State<_OperationsDashboard> {
     });
   }
 
+  void _refreshDashboard() {
+    setState(() {
+      _dashboard = _loadDashboard();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_OperationsDashboardData?>(
@@ -765,14 +771,12 @@ class _OperationsDashboardState extends State<_OperationsDashboard> {
                   const SizedBox(height: 4),
                   Text('${snapshot.error}'),
                   Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () {
-                        setState(() => _dashboard = _loadDashboard());
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                    ),
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _refreshDashboard,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
                   ),
                 ],
               ),
@@ -802,9 +806,7 @@ class _OperationsDashboardState extends State<_OperationsDashboard> {
                 ),
                 IconButton(
                   tooltip: 'Refresh dashboard',
-                  onPressed: () {
-                    setState(() => _dashboard = _loadDashboard());
-                  },
+                  onPressed: _refreshDashboard,
                   icon: const Icon(Icons.refresh),
                 ),
               ],
@@ -820,7 +822,7 @@ class _OperationsDashboardState extends State<_OperationsDashboard> {
                   crossAxisCount: columns,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: columns == 2 ? 1.35 : 1.45,
+                  childAspectRatio: columns == 2 ? 1.32 : 1.45,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [

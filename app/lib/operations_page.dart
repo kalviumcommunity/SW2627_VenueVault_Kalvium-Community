@@ -125,7 +125,30 @@ class _DispatchList extends StatelessWidget {
                         .compareTo(_statusRank(b.data()['status'])),
               );
             if (dispatches.isEmpty) {
-              return const Center(child: Text('No dispatches yet.'));
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('No dispatches yet.'),
+                      if (canAssign) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Existing confirmed bookings may not have dispatch records yet.',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: () => _createMissingDispatches(context),
+                          icon: const Icon(Icons.sync),
+                          label: const Text('Create missing dispatches'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
             }
             return ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -239,6 +262,78 @@ class _DispatchList extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+Future<void> _createMissingDispatches(BuildContext context) async {
+  try {
+    final db = FirebaseFirestore.instance;
+    final bookingsSnapshot = await db
+        .collection('bookings')
+        .where('status', isEqualTo: 'confirmed')
+        .get();
+    final dispatchesSnapshot = await db.collection('dispatches').get();
+    final existingIds = dispatchesSnapshot.docs.map((doc) => doc.id).toSet();
+    final batch = db.batch();
+    var created = 0;
+
+    for (final booking in bookingsSnapshot.docs) {
+      if (existingIds.contains(booking.id)) continue;
+      final data = booking.data();
+      final startDate = data['startDate'];
+      final endDate = data['endDate'];
+      final items = data['items'];
+      if (startDate is! Timestamp || endDate is! Timestamp || items is! List) {
+        continue;
+      }
+      final dispatchItems = items.whereType<Map>().map((item) {
+        return {
+          ...item,
+          'packed': false,
+          'missing': false,
+        };
+      }).toList();
+      if (dispatchItems.isEmpty) continue;
+
+      batch.set(db.collection('dispatches').doc(booking.id), {
+        'bookingId': booking.id,
+        'eventName': data['eventName'] as String? ?? 'Event booking',
+        'venue': data['venue'] as String? ?? '',
+        'dispatchDate': startDate,
+        'dispatchTime': startDate,
+        'pickupDate': endDate,
+        'assignedStaffName': data['staffName'] as String? ?? '',
+        'assignedStaffUid': null,
+        'transportReference': '',
+        'items': dispatchItems,
+        'status': 'pending',
+        'createdBy': data['createdBy'] as String? ?? '',
+        'updatedBy': data['updatedBy'] as String? ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      created++;
+    }
+
+    if (created > 0) {
+      await batch.commit();
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            created == 0
+                ? 'No confirmed bookings are missing dispatches.'
+                : 'Created $created missing dispatch record(s).',
+          ),
+        ),
+      );
+    }
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create dispatches: $error')),
+      );
+    }
   }
 }
 
